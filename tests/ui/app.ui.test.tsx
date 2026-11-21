@@ -78,6 +78,20 @@ describe('CivicResolve Phase 2 Frontend UI, Dual-Portal Login & Strict Workspace
       expect(screen.getAllByText(/Water & Sewage/i).length).toBeGreaterThan(0);
     });
 
+    // Verify 2. Pin Point on Map interactive coordinate/street pinning updates location address
+    const pinModeBtn = screen.getByRole('button', {
+      name: /2\. Pin Point on Map/i,
+    });
+    fireEvent.click(pinModeBtn);
+    const pinInput = screen.getByLabelText(/Pin street name or coordinates/i);
+    fireEvent.change(pinInput, {
+      target: { value: '37.7812, -122.4115' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Pin Here$/i }));
+    expect(
+      screen.getByDisplayValue(/37\.7812, -122\.4115|Near Civic Center/i),
+    ).toBeDefined();
+
     const submitBtn = screen.getByRole('button', {
       name: /2\. Submit Official Report/i,
     });

@@ -118,28 +118,23 @@ export function PortalLoginView({
   return (
     <section
       aria-labelledby="portal-gate-heading"
-      className="mx-auto flex h-full max-w-6xl flex-col justify-center px-4 py-4 sm:px-8"
+      className="mx-auto flex h-full w-full max-w-6xl flex-col justify-center px-4 py-4 sm:px-8"
     >
-      {/* Prominent Editorial Hero Header */}
-      <div className="mb-5 text-center">
+      {/* Prominent Single-Color Black Editorial Hero Header Aligned Over Both Dashboards */}
+      <div className="mb-6 w-full text-center">
         <h1
           id="portal-gate-heading"
-          className="text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl"
+          className="text-3xl leading-[1.1] font-black tracking-tight text-[#11131a] sm:text-4xl lg:text-[2.85rem] xl:text-5xl dark:text-white"
         >
-          <span className="text-slate-500 dark:text-slate-400">
-            {t.gateWelcomePrefix}{' '}
-          </span>
-          <span className="text-[#11131a] dark:text-white">
-            {t.gateWelcomeMain}
-          </span>
+          {t.gateWelcomePrefix} {t.gateWelcomeMain}
         </h1>
-        <p className="mx-auto mt-1.5 max-w-2xl text-xs text-slate-700 sm:text-sm dark:text-slate-300">
+        <p className="mx-auto mt-2 max-w-3xl text-xs font-medium text-slate-700 sm:text-sm dark:text-slate-300">
           {t.gateSubtitle}
         </p>
       </div>
 
-      {/* 2 Compact Side-by-Side Login Cards Fitting on 1 Screen */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      {/* 2 Side-by-Side Workspace Dashboards Aligned Directly Under the Hero Message */}
+      <div className="grid w-full grid-cols-1 items-stretch gap-5 lg:grid-cols-2">
         {/* LEFT CARD: CITIZEN PORTAL LOGIN ONLY */}
         <article
           aria-labelledby="citizen-login-heading"

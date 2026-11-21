@@ -614,6 +614,7 @@ export function ReportIssueView({
             <CivicMap
               mode="picker"
               darkTheme={darkTheme}
+              language={language}
               selectedLocation={location}
               onSelectLocation={setLocation}
               issues={existingIssues}

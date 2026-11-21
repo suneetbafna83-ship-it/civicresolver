@@ -6,19 +6,26 @@ import { createDevServer } from './server/devServer.js';
 
 function civicApiMiddlewarePlugin(): Plugin {
   const apiApp = createDevServer();
+  const handler = (
+    req: IncomingMessage,
+    res: ServerResponse,
+    next: () => void,
+  ): void => {
+    const url = req.url ?? '';
+    if (url === '/api' || url.startsWith('/api/')) {
+      apiApp(req, res);
+      return;
+    }
+    next();
+  };
+
   return {
     name: 'civicresolve-api-middleware',
     configureServer(server) {
-      server.middlewares.use(
-        (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-          const url = req.url ?? '';
-          if (url === '/api' || url.startsWith('/api/')) {
-            apiApp(req, res);
-            return;
-          }
-          next();
-        },
-      );
+      server.middlewares.use(handler);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(handler);
     },
   };
 }

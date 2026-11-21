@@ -11,9 +11,11 @@ import {
   Lock,
   MapPin,
   Save,
+  Search,
   ShieldAlert,
   ShieldCheck,
   UserCheck,
+  X,
   XCircle,
 } from 'lucide-react';
 import {
@@ -99,6 +101,7 @@ export function AdminDashboardView({
   const [selectedStatus, setSelectedStatus] = useState<IssueStatus | 'ALL'>(
     'ALL',
   );
+  const [searchQuery, setSearchQuery] = useState('');
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [showAuditLog, setShowAuditLog] = useState(false);
 
@@ -164,6 +167,12 @@ export function AdminDashboardView({
     scopedDepartment !== null ? scopedDepartment : selectedDepartment;
 
   const sortedIssues = useMemo(() => {
+    const tokens = searchQuery
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((tok) => tok.length > 0);
+
     const filtered = scopeFilteredIssues.filter((issue) => {
       if (
         effectiveDepartment !== 'ALL' &&
@@ -180,6 +189,27 @@ export function AdminDashboardView({
       ) {
         return false;
       }
+      if (tokens.length > 0) {
+        const haystack = [
+          issue.id,
+          issue.title,
+          issue.description,
+          issue.category,
+          issue.location.address,
+          issue.assignedDepartment,
+          issue.recommendedDepartment,
+          issue.priorityLevel,
+          issue.status,
+          issue.reporterDisplayName,
+          issue.resolutionNotes ?? '',
+          translateDepartment(issue.assignedDepartment, language),
+          translatePriority(issue.priorityLevel, language),
+          translateStatus(issue.status, language),
+        ]
+          .join(' ')
+          .toLowerCase();
+        return tokens.every((tok) => haystack.includes(tok));
+      }
       return true;
     });
 
@@ -195,7 +225,14 @@ export function AdminDashboardView({
       }
       return b.upvoteCount - a.upvoteCount;
     });
-  }, [effectiveDepartment, overdueOnly, scopeFilteredIssues, selectedStatus]);
+  }, [
+    effectiveDepartment,
+    language,
+    overdueOnly,
+    scopeFilteredIssues,
+    searchQuery,
+    selectedStatus,
+  ]);
 
   const recordAudit = (
     issue: { readonly id: string; readonly title: string },
@@ -665,21 +702,48 @@ export function AdminDashboardView({
           </div>
         )}
 
-        <select
-          aria-label="Filter admin queue by status"
-          value={selectedStatus}
-          onChange={(e) =>
-            setSelectedStatus(e.target.value as IssueStatus | 'ALL')
-          }
-          className="min-h-[38px] rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-[#11131a] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-        >
-          <option value="ALL">{t.allStatuses}</option>
-          {ISSUE_STATUSES.map((st) => (
-            <option key={st} value={st}>
-              {translateStatus(st, language)}
-            </option>
-          ))}
-        </select>
+        <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
+            <Search
+              className="pointer-events-none absolute top-3 left-3.5 h-4 w-4 text-slate-500"
+              aria-hidden="true"
+            />
+            <input
+              type="search"
+              aria-label="Search admin dispatch queue"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t.searchPlaceholder}
+              className="min-h-[38px] w-full rounded-full border border-slate-300 bg-white py-1.5 pr-8 pl-10 text-xs font-medium text-[#11131a] placeholder:text-slate-500 sm:w-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
+            />
+            {searchQuery.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear admin search query"
+                className="absolute top-2.5 right-2.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+
+          <select
+            aria-label="Filter admin queue by status"
+            value={selectedStatus}
+            onChange={(e) =>
+              setSelectedStatus(e.target.value as IssueStatus | 'ALL')
+            }
+            className="min-h-[38px] rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-[#11131a] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          >
+            <option value="ALL">{t.allStatuses}</option>
+            {ISSUE_STATUSES.map((st) => (
+              <option key={st} value={st}>
+                {translateStatus(st, language)}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Priority Dispatch Queue */}

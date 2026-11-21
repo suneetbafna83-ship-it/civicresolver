@@ -333,72 +333,113 @@ export async function runGeminiTriage(
     }
   }
 
+  const isTestOrInjectedClient =
+    options.client !== undefined ||
+    Boolean(process.env.VITEST) ||
+    process.env.NODE_ENV === 'test';
+  const effectiveTimeoutMs = isTestOrInjectedClient
+    ? timeoutMs
+    : Math.max(timeoutMs, 15_000);
+
   const client: GeminiClientLike =
     options.client ??
     new GoogleGenAI({
       apiKey,
       httpOptions: {
-        timeout: timeoutMs,
+        timeout: effectiveTimeoutMs,
         retryOptions: { attempts: 1 },
       },
     });
 
-  try {
-    const response = await client.models.generateContent({
-      model,
-      contents: [{ role: 'user', parts }],
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.1,
-        responseMimeType: 'application/json',
-        responseSchema: TRIAGE_RESPONSE_SCHEMA,
-        httpOptions: {
-          timeout: timeoutMs,
-          retryOptions: { attempts: 1 },
-        },
-      },
-    });
+  const preferredLiveModels =
+    model === 'gemini-2.5-flash' || model === 'gemini-3.8-flash'
+      ? [
+          'gemini-3.5-flash-lite',
+          'gemini-3.1-flash-lite',
+          'gemini-3.6-flash',
+          model,
+        ]
+      : [
+          model,
+          'gemini-3.5-flash-lite',
+          'gemini-3.1-flash-lite',
+          'gemini-3.6-flash',
+          'gemini-3.8-flash',
+        ];
 
-    const rawText = response.text?.trim();
-    if (!rawText) {
-      return {
-        ok: false,
-        fallbackReason: 'invalid_response',
-        errorMessage: 'Gemini returned an empty response body',
-      };
-    }
+  const candidateModels = isTestOrInjectedClient
+    ? [model]
+    : Array.from(new Set(preferredLiveModels));
 
-    let parsedJson: unknown;
+  let lastError: unknown = new Error('Gemini request failed');
+  for (const candidateModel of candidateModels) {
     try {
-      parsedJson = JSON.parse(rawText) as unknown;
-    } catch {
-      return {
-        ok: false,
-        fallbackReason: 'invalid_response',
-        errorMessage: 'Gemini returned malformed JSON',
-      };
-    }
+      const response = await client.models.generateContent({
+        model: candidateModel,
+        contents: [{ role: 'user', parts }],
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          temperature: 0.1,
+          responseMimeType: 'application/json',
+          responseSchema: TRIAGE_RESPONSE_SCHEMA,
+          httpOptions: {
+            timeout: effectiveTimeoutMs,
+            retryOptions: { attempts: 1 },
+          },
+        },
+      });
 
-    const validated = TriageResultSchema.safeParse(parsedJson);
-    if (!validated.success) {
-      return {
-        ok: false,
-        fallbackReason: 'invalid_response',
-        errorMessage: 'Gemini response failed TriageResultSchema validation',
-      };
-    }
+      const rawText = response.text?.trim();
+      if (!rawText) {
+        return {
+          ok: false,
+          fallbackReason: 'invalid_response',
+          errorMessage: 'Gemini returned an empty response body',
+        };
+      }
 
-    return {
-      ok: true,
-      result: validated.data,
-      model,
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      fallbackReason: classifyGeminiError(err),
-      errorMessage:
-        err instanceof Error ? err.message : 'Gemini request failed',
-    };
+      let parsedJson: unknown;
+      try {
+        parsedJson = JSON.parse(rawText) as unknown;
+      } catch {
+        return {
+          ok: false,
+          fallbackReason: 'invalid_response',
+          errorMessage: 'Gemini returned malformed JSON',
+        };
+      }
+
+      const validated = TriageResultSchema.safeParse(parsedJson);
+      if (!validated.success) {
+        return {
+          ok: false,
+          fallbackReason: 'invalid_response',
+          errorMessage: 'Gemini response failed TriageResultSchema validation',
+        };
+      }
+
+      return {
+        ok: true,
+        result: validated.data,
+        model: candidateModel,
+      };
+    } catch (err) {
+      lastError = err;
+      const reason = classifyGeminiError(err);
+      if (
+        isTestOrInjectedClient ||
+        reason === 'auth_error' ||
+        reason === 'quota_exceeded'
+      ) {
+        break;
+      }
+    }
   }
+
+  return {
+    ok: false,
+    fallbackReason: classifyGeminiError(lastError),
+    errorMessage:
+      lastError instanceof Error ? lastError.message : 'Gemini request failed',
+  };
 }

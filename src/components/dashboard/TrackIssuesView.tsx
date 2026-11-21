@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Building2,
   CheckCircle2,
@@ -9,6 +9,7 @@ import {
   MapPin,
   Search,
   ThumbsUp,
+  X,
 } from 'lucide-react';
 import {
   ISSUE_CATEGORIES,
@@ -83,7 +84,12 @@ export function TrackIssuesView({
   );
 
   const filteredIssues = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const tokens = searchQuery
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((tok) => tok.length > 0);
+
     return issues.filter((issue) => {
       if (statusFilter !== 'ALL' && issue.status !== statusFilter) {
         return false;
@@ -91,14 +97,43 @@ export function TrackIssuesView({
       if (categoryFilter !== 'ALL' && issue.category !== categoryFilter) {
         return false;
       }
-      if (q.length > 0) {
-        const haystack =
-          `${issue.title} ${issue.description} ${issue.location.address} ${issue.assignedDepartment}`.toLowerCase();
-        return haystack.includes(q);
+      if (tokens.length > 0) {
+        const haystack = [
+          issue.id,
+          issue.title,
+          issue.description,
+          issue.category,
+          issue.location.address,
+          issue.assignedDepartment,
+          issue.recommendedDepartment,
+          issue.priorityLevel,
+          issue.status,
+          issue.reporterDisplayName,
+          issue.resolutionNotes ?? '',
+          translateDepartment(issue.assignedDepartment, language),
+          translatePriority(issue.priorityLevel, language),
+          translateStatus(issue.status, language),
+        ]
+          .join(' ')
+          .toLowerCase();
+        return tokens.every((tok) => haystack.includes(tok));
       }
       return true;
     });
-  }, [categoryFilter, issues, searchQuery, statusFilter]);
+  }, [categoryFilter, issues, language, searchQuery, statusFilter]);
+
+  useEffect(() => {
+    if (filteredIssues.length === 0) {
+      setSelectedIssueId(null);
+      return;
+    }
+    const stillVisible = filteredIssues.some(
+      (item) => item.id === selectedIssueId,
+    );
+    if (!stillVisible) {
+      setSelectedIssueId(filteredIssues[0]?.id ?? null);
+    }
+  }, [filteredIssues, selectedIssueId]);
 
   return (
     <section
@@ -172,8 +207,18 @@ export function TrackIssuesView({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.searchPlaceholder}
-              className="min-h-[38px] w-full rounded-full border border-slate-300 bg-white py-1.5 pr-4 pl-10 text-xs font-medium text-[#11131a] placeholder:text-slate-500 sm:w-64 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
+              className="min-h-[38px] w-full rounded-full border border-slate-300 bg-white py-1.5 pr-8 pl-10 text-xs font-medium text-[#11131a] placeholder:text-slate-500 sm:w-64 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
             />
+            {searchQuery.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear search query"
+                className="absolute top-2.5 right-2.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            )}
           </div>
 
           <select
@@ -436,6 +481,7 @@ export function TrackIssuesView({
             <CivicMap
               mode="overview"
               darkTheme={darkTheme}
+              language={language}
               issues={filteredIssues}
               selectedIssueId={selectedIssueId}
               onSelectIssue={setSelectedIssueId}
