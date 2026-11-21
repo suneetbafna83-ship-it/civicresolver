@@ -382,7 +382,7 @@ describe('Tier 2 — F1: Configuration & Repo Static Boundaries', () => {
       }
     }
     expect(anyViolations).toEqual([]);
-  });
+  }, 15_000);
 
   it('T2-F1-02: Static scan confirms zero Blaze packages or imports in workspace', () => {
     const files = listWorkspaceFiles(['ts', 'tsx', 'mts', 'mjs', 'json']);

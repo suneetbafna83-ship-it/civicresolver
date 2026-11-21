@@ -21,6 +21,7 @@ import {
   type IssueRepository,
 } from './issueRepository.js';
 import { createSeedIssues } from './seedIssues.js';
+import { generateSecureId } from '../utils/secureId.js';
 
 export const LOCAL_ISSUES_STORAGE_KEY = 'civicresolve.issues.v1';
 export const LOCAL_VOTES_STORAGE_KEY = 'civicresolve.votes.v1';
@@ -71,10 +72,7 @@ export function resolveBrowserStorage(): KeyValueStorage {
 }
 
 function defaultIdGenerator(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `local-${crypto.randomUUID()}`;
-  }
-  return `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return generateSecureId('local');
 }
 
 export class LocalIssueRepository implements IssueRepository {

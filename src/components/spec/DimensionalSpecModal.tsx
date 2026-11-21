@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
 export interface DimensionalSpecModalProps {
@@ -10,6 +10,19 @@ export function DimensionalSpecModal({
   isOpen,
   onClose,
 }: DimensionalSpecModalProps): React.ReactElement | null {
+  useEffect(() => {
+    if (!isOpen || typeof window === 'undefined') {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) {
     return null;
   }

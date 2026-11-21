@@ -285,4 +285,44 @@ describe('CivicResolve Phase 2 Frontend UI, Dual-Portal Login & Strict Workspace
       screen.getByRole('button', { name: /Immutable Municipal Audit Log/i }),
     ).toBeDefined();
   });
+
+  it('enforces WCAG 2.1 AA landmarks, skip-to-content link, dynamic html lang sync, and semantic chart/progress roles', async () => {
+    render(<App />);
+
+    // 1. Skip-to-main-content bypass link and #main-content landmark
+    const skipLink = screen.getByRole('link', { name: /Skip to main content/i });
+    expect(skipLink.getAttribute('href')).toBe('#main-content');
+    expect(document.getElementById('main-content')?.tagName).toBe('MAIN');
+
+    // 2. Dynamic document.documentElement.lang synchronization across EN -> HI -> TA -> EN
+    expect(document.documentElement.lang).toBe('en');
+    const langBtn = screen.getByRole('button', {
+      name: /Toggle language between English and Hindi/i,
+    });
+    fireEvent.click(langBtn);
+    expect(document.documentElement.lang).toBe('hi');
+    fireEvent.click(langBtn);
+    expect(document.documentElement.lang).toBe('ta');
+    fireEvent.click(langBtn);
+    expect(document.documentElement.lang).toBe('en');
+
+    // 3. Citizen Track view exposes accessible SVG role="img" charts and role="progressbar" step tracks
+    fireEvent.click(
+      screen.getByRole('button', { name: /Enter Citizen Workspace/i }),
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /2\. Track Complaints/i }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole('progressbar').length,
+      ).toBeGreaterThan(0);
+      expect(
+        screen.getByRole('img', { name: /SLA Health Score/i }),
+      ).toBeDefined();
+      expect(
+        screen.getByRole('img', { name: /6-day reported vs resolved trend chart/i }),
+      ).toBeDefined();
+    });
+  });
 });

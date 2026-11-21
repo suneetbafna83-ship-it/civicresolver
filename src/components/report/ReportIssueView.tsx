@@ -1,23 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import {
-  AlertTriangle,
-  Camera,
-  CheckCircle2,
-  Clock,
-  Mic,
-  MicOff,
-  Send,
-  Sparkles,
-  ThumbsUp,
-  Trash2,
-} from 'lucide-react';
+import { Camera, Mic, MicOff, Send, Sparkles, Trash2 } from 'lucide-react';
 import {
   ISSUE_CATEGORIES,
   type CivicIssue,
   type IssueCategory,
   type IssueCreateInput,
   type IssueLocation,
-  type PriorityLevel,
   type TriageResponse,
   type UploadImageMimeType,
 } from '../../../shared/types/civic.js';
@@ -36,84 +24,8 @@ import {
 } from '../../lib/media/imageCompressor.js';
 import { useSpeechToText } from '../../lib/voice/useSpeechToText.js';
 import { CivicMap, NEIGHBORHOOD_PRESETS } from '../map/CivicMap.js';
-
-interface SamplePreset {
-  readonly id: string;
-  readonly badge: string;
-  readonly title: string;
-  readonly description: string;
-  readonly location: IssueLocation;
-  readonly presetIndex: number;
-}
-
-const JUDGE_SAMPLE_PRESETS: ReadonlyArray<SamplePreset> = [
-  {
-    id: 'preset-pothole',
-    badge: 'Sample 1: Deep Pothole',
-    title: 'Deep pothole near Central Market intersection',
-    description:
-      'A wide water-filled pothole has opened across the eastbound lane outside Central Market, forcing two-wheelers and cars to swerve sharply.',
-    location: {
-      lat: 37.7749,
-      lng: -122.4194,
-      address: '240 Market St, Downtown District',
-    },
-    presetIndex: 1,
-  },
-  {
-    id: 'preset-water',
-    badge: 'Sample 2: Burst Water Pipe',
-    title: 'Pressurized water pipe leaking across Civic Center sidewalk',
-    description:
-      'Clean water is spraying from a ruptured underground valve near the Oakwood bus stop and flooding the pedestrian crossing.',
-    location: {
-      lat: 37.7795,
-      lng: -122.4151,
-      address: '92 Oakwood Ave, Civic Center',
-    },
-    presetIndex: 2,
-  },
-  {
-    id: 'preset-streetlight',
-    badge: 'Sample 3: Broken Streetlight',
-    title: 'Damaged streetlight pole with exposed wire near Elm Park',
-    description:
-      'Streetlight pole #18 is dark and its junction box cover is open with low-hanging cable near the evening walking path.',
-    location: {
-      lat: 37.7685,
-      lng: -122.4261,
-      address: '512 Elm Park North Path',
-    },
-    presetIndex: 3,
-  },
-  {
-    id: 'preset-garbage',
-    badge: 'Sample 4: Overflowing Bins',
-    title: 'Uncollected overflowing garbage dumpsters at Harbor Alley',
-    description:
-      'Three municipal waste bins have been overflowing onto the pavement for four days, causing strong odor and blocked walkway access.',
-    location: {
-      lat: 37.7841,
-      lng: -122.4072,
-      address: '19 Harbor Plaza Service Alley',
-    },
-    presetIndex: 4,
-  },
-];
-
-function getPriorityIndicatorDot(priority: PriorityLevel): string {
-  switch (priority) {
-    case 'Critical':
-      return 'bg-red-600';
-    case 'High':
-      return 'bg-amber-600';
-    case 'Medium':
-      return 'bg-indigo-700';
-    case 'Low':
-    default:
-      return 'bg-slate-500';
-  }
-}
+import { JUDGE_SAMPLE_PRESETS, type SamplePreset } from './samplePresets.js';
+import { TriagePreviewPanel } from './TriagePreviewPanel.js';
 
 export interface ReportIssueViewProps {
   readonly existingIssues: ReadonlyArray<CivicIssue>;
@@ -122,6 +34,14 @@ export interface ReportIssueViewProps {
   readonly getIdToken: () => Promise<string | null>;
   readonly onCreateIssue: (input: IssueCreateInput) => Promise<CivicIssue>;
   readonly onUpvoteDuplicate: (issueId: string) => Promise<void>;
+}
+
+interface AttachedPhotoState {
+  readonly dataUrl: string;
+  readonly mimeType: UploadImageMimeType;
+  readonly originalBytes: number;
+  readonly compressedBytes: number;
+  readonly label: string;
 }
 
 export function ReportIssueView({
@@ -145,14 +65,9 @@ export function ReportIssueView({
     address: defaultLoc.address,
   });
 
-  const [photoPayload, setPhotoPayload] = useState<{
-    readonly dataUrl: string;
-    readonly mimeType: UploadImageMimeType;
-    readonly originalBytes: number;
-    readonly compressedBytes: number;
-    readonly label: string;
-  } | null>(null);
-
+  const [photoPayload, setPhotoPayload] = useState<AttachedPhotoState | null>(
+    null,
+  );
   const [triageResponse, setTriageResponse] = useState<TriageResponse | null>(
     null,
   );
@@ -177,7 +92,7 @@ export function ReportIssueView({
       currentTitle: string,
       currentDescription: string,
       currentLocation: IssueLocation,
-      currentPhoto: typeof photoPayload,
+      currentPhoto: AttachedPhotoState | null,
     ): Promise<TriageResponse | null> => {
       const cleanTitle = currentTitle.trim();
       const cleanDesc = currentDescription.trim();
@@ -227,7 +142,7 @@ export function ReportIssueView({
       setLocation(preset.location);
       setCategoryOverride('AUTO');
       const webpSample = getSamplePresetWebp(preset.presetIndex);
-      const nextPhoto = {
+      const nextPhoto: AttachedPhotoState = {
         dataUrl: webpSample.dataUrl,
         mimeType: webpSample.mimeType,
         originalBytes: 420_000,
@@ -365,21 +280,18 @@ export function ReportIssueView({
       aria-labelledby="report-heading"
       className="mx-auto flex h-full max-w-6xl flex-col justify-center px-4 py-3 sm:px-8"
     >
-      {/* Compact Single-Screen Header + Quick Demo Presets */}
       <div className="mb-3 flex flex-col justify-between gap-2.5 lg:flex-row lg:items-center">
-        <div>
-          <h1
-            id="report-heading"
-            className="text-lg font-bold tracking-tight sm:text-xl"
-          >
-            <span className="text-slate-500 dark:text-slate-400">
-              {t.reportLead}{' '}
-            </span>
-            <span className="text-[#11131a] dark:text-white">
-              {t.reportTitle}
-            </span>
-          </h1>
-        </div>
+        <h1
+          id="report-heading"
+          className="text-lg font-bold tracking-tight sm:text-xl"
+        >
+          <span className="text-slate-500 dark:text-slate-400">
+            {t.reportLead}{' '}
+          </span>
+          <span className="text-[#11131a] dark:text-white">
+            {t.reportTitle}
+          </span>
+        </h1>
 
         <div className="flex flex-wrap items-center gap-1.5">
           {JUDGE_SAMPLE_PRESETS.map((preset) => (
@@ -395,14 +307,11 @@ export function ReportIssueView({
         </div>
       </div>
 
-      {/* Single-Page Non-Scrolling Desktop Grid (Stacks Cleanly on Mobile) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        {/* Left Column: Citizen Form (7 cols) */}
         <form
           onSubmit={(e) => void handleSubmitReport(e)}
           className="surface-card flex flex-col justify-between gap-3 p-4 sm:p-5 lg:col-span-7"
         >
-          {/* Step 1: Deep Plum Add Photo + Voice Bar */}
           <div className="surface-well flex flex-wrap items-center justify-between gap-2 p-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <label
@@ -436,7 +345,10 @@ export function ReportIssueView({
                   </>
                 ) : (
                   <>
-                    <Mic className="h-3.5 w-3.5 text-[#581c87] dark:text-purple-300" aria-hidden="true" />
+                    <Mic
+                      className="h-3.5 w-3.5 text-[#581c87] dark:text-purple-300"
+                      aria-hidden="true"
+                    />
                     <span>{t.speakIssue}</span>
                   </>
                 )}
@@ -446,7 +358,9 @@ export function ReportIssueView({
             {photoPayload ? (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
                 <span className="tabular-nums rounded-full bg-emerald-500/15 px-2.5 py-0.5">
-                  WebP ({Math.max(1, Math.round(photoPayload.compressedBytes / 1024))} KB)
+                  WebP (
+                  {Math.max(1, Math.round(photoPayload.compressedBytes / 1024))}{' '}
+                  KB)
                 </span>
                 <button
                   type="button"
@@ -473,7 +387,6 @@ export function ReportIssueView({
             </p>
           )}
 
-          {/* Step 2: Issue Title */}
           <div>
             <label
               htmlFor="issue-title-input"
@@ -494,7 +407,6 @@ export function ReportIssueView({
             />
           </div>
 
-          {/* Step 3: Detailed Description */}
           <div>
             <label
               htmlFor="issue-description-input"
@@ -515,7 +427,6 @@ export function ReportIssueView({
             />
           </div>
 
-          {/* Step 4: Street Address & Category */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label
@@ -570,7 +481,6 @@ export function ReportIssueView({
             </div>
           )}
 
-          {/* Action Buttons: Black Submit Official Report */}
           <div className="flex flex-wrap items-center justify-end gap-2.5 border-t border-slate-200/80 pt-3 dark:border-slate-800">
             <button
               type="button"
@@ -600,7 +510,6 @@ export function ReportIssueView({
           </div>
         </form>
 
-        {/* Right Column: Bigger Map + Compact Gemini AI Triage Card (5 cols) */}
         <div className="flex flex-col gap-4 lg:col-span-5">
           <div className="surface-card p-3.5 sm:p-4">
             <div className="mb-2 flex items-center justify-between">
@@ -622,116 +531,12 @@ export function ReportIssueView({
             />
           </div>
 
-          <div aria-live="polite" className="surface-card p-4">
-            <div className="flex items-center justify-between border-b border-slate-200/80 pb-2 dark:border-slate-800">
-              <div className="flex items-center gap-1.5">
-                <Sparkles
-                  className="h-4 w-4 text-[#3730a3] dark:text-indigo-300"
-                  aria-hidden="true"
-                />
-                <h2 className="text-sm font-bold text-[#11131a] dark:text-white">
-                  {t.aiRoutingTitle}
-                </h2>
-              </div>
-              {triageResponse && (
-                <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold text-[#3730a3] dark:bg-indigo-950 dark:text-indigo-200">
-                  {triageResponse.metadata.engine === 'gemini'
-                    ? 'Gemini Live'
-                    : 'Civic NLP'}
-                </span>
-              )}
-            </div>
-
-            {!triageResponse ? (
-              <p className="py-3 text-center text-xs text-slate-600 dark:text-slate-300">
-                {t.aiPreviewHint}
-              </p>
-            ) : (
-              <div className="mt-2.5 flex flex-col gap-2 text-xs">
-                {duplicateMatchedIssue && (
-                  <div className="surface-well flex flex-col gap-1.5 border-amber-400 bg-amber-50/90 p-2.5 dark:border-amber-700 dark:bg-amber-950/50">
-                    <div className="flex items-center gap-1.5 font-bold text-amber-950 dark:text-amber-100">
-                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                      <span>
-                        Similar report nearby ({duplicateMatchedIssue.upvoteCount} affected)
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void onUpvoteDuplicate(duplicateMatchedIssue.id)
-                      }
-                      className="press-feedback inline-flex items-center justify-center gap-1.5 rounded-full bg-[#3730a3] px-3 py-1.5 text-[11px] font-semibold text-white"
-                    >
-                      <ThumbsUp className="h-3 w-3" aria-hidden="true" />
-                      <span>+1 Upvote Existing Report Instead</span>
-                    </button>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="surface-well p-2.5">
-                    <span className="text-[11px] text-slate-600 dark:text-slate-300">
-                      Category
-                    </span>
-                    <p className="font-bold text-[#11131a] dark:text-white">
-                      {triageResponse.triage.category}
-                    </p>
-                  </div>
-
-                  <div className="surface-well p-2.5">
-                    <span className="text-[11px] text-slate-600 dark:text-slate-300">
-                      Department
-                    </span>
-                    <p className="font-bold text-[#3730a3] dark:text-indigo-300">
-                      {triageResponse.triage.recommendedDepartment}
-                    </p>
-                  </div>
-
-                  <div className="surface-well p-2.5">
-                    <span className="text-[11px] text-slate-600 dark:text-slate-300">
-                      Priority &amp; Urgency
-                    </span>
-                    <div className="mt-0.5 flex items-center gap-1.5">
-                      <span
-                        className={`h-2 w-2 rounded-full ${getPriorityIndicatorDot(
-                          triageResponse.triage.priorityLevel,
-                        )}`}
-                      />
-                      <span className="font-bold text-[#11131a] dark:text-white">
-                        {triageResponse.triage.priorityLevel} ·{' '}
-                        {triageResponse.triage.urgencyScore}/10
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="surface-well p-2.5">
-                    <span className="text-[11px] text-slate-600 dark:text-slate-300">
-                      Target SLA
-                    </span>
-                    <p className="tabular-nums mt-0.5 flex items-center gap-1 font-bold text-[#11131a] dark:text-white">
-                      <Clock className="h-3 w-3" aria-hidden="true" />
-                      <span>{triageResponse.triage.slaEstimateHours} hrs</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
-                  <span className="inline-flex items-center gap-1">
-                    <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    Authentic (
-                    {Math.round(
-                      triageResponse.triage.authenticityCheck.confidence * 100,
-                    )}
-                    %)
-                  </span>
-                  <span className="truncate max-w-[220px] text-slate-600 dark:text-slate-300">
-                    {triageResponse.triage.summary}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
+          <TriagePreviewPanel
+            triageResponse={triageResponse}
+            duplicateMatchedIssue={duplicateMatchedIssue}
+            language={language}
+            onUpvoteDuplicate={onUpvoteDuplicate}
+          />
         </div>
       </div>
     </section>

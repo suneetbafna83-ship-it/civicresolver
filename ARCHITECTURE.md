@@ -70,28 +70,32 @@ flowchart LR
 - `src/lib/index.ts` — Barrel facade of client library modules.
 - `src/lib/firebase/config.ts` — Spark-only modular Firebase initialization (`firebase/app`, `firebase/auth`, `firebase/firestore`, zero Blaze SDKs).
 - `src/lib/auth/`:
-  - `authService.ts` — Citizen Google/Email/Auto-Provision/Demo Guest + Municipal Admin Demo & Verified Department Officer login (`signInDepartmentOfficer`).
+  - `authService.ts` — Core session orchestrator (Citizen Google/Email/Demo Guest + Municipal Admin Demo & Verified Department Officer login).
+  - `authTypes.ts`, `authErrorMapper.ts`, `localAuthStore.ts` — Strict auth contracts, Firebase error mapper, and Zod-validated session/account storage.
+  - `emailAuthHandler.ts` — Hardened email sign-in/sign-up with strict password verification (zero password-bypass fallback on existing Firebase or offline PBKDF2 accounts).
+  - `officerAuthHandler.ts` — Department clearance scope verifier (`assertDepartmentClearance`) for PBKDF2 roster and Firebase `admins/{uid}` officers.
   - `passwordHasher.ts` — Web Crypto `PBKDF2-HMAC-SHA256` (`100,000` iterations, 16-byte random salt, constant-time comparison).
   - `departmentRoster.ts` — Salted PBKDF2-SHA256 department officer directory (zero plaintext passkeys).
 - `src/lib/repositories/`:
   - `issueRepository.ts` — `IssueRepository` interface, Zod input checks, state-transition machine, and department RBAC guards (`applyDepartmentReadScope`, `assertDepartmentReadAccess`, `assertDepartmentWriteScope`).
   - `firestoreIssueRepository.ts` — Atomic `runTransaction` upvoting, bounded `limit(50)` queries, and `getVerifiedAdminProfile`.
-  - `localIssueRepository.ts` — Browser `localStorage` fallback seeded with 6 realistic municipal issues (`seedIssues.ts`).
+  - `localIssueRepository.ts` — Browser `localStorage` fallback seeded with 6 realistic municipal issues (`seedIssues.ts`) using Web Crypto `generateSecureId`.
   - `hybridIssueRepository.ts` — Automatic zero-downtime failover between Firestore and Local + sandbox overlay for unverified Demo Admin mutations.
-- `src/lib/admin/adminWorkflowStore.ts` — Zod-validated Cross-Department Handover Request queue and Immutable Municipal Audit Log.
+- `src/lib/admin/adminWorkflowStore.ts` — Zod-validated Cross-Department Handover Request queue and Immutable Municipal Audit Log (Web Crypto IDs).
 - `src/lib/media/` — Client-side Canvas WebP compressor (`< 120 KB`) and RIFF/WEBP magic-byte validator.
-- `src/lib/i18n/translations.ts` — Complete tri-lingual UI dictionary (`en`, `hi`, `ta`) + voice recognition locales (`en-IN`, `hi-IN`, `ta-IN`).
+- `src/lib/i18n/` — Modular tri-lingual dictionary (`types.ts`, `locales/en.ts`, `locales/hi.ts`, `locales/ta.ts`, `translations.ts`) + voice recognition locales (`en-IN`, `hi-IN`, `ta-IN`).
 - `src/lib/export/civicExport.ts` — OWASP formula-injection-safe CSV exporter and printable official citizen receipt generator.
-- `src/lib/utils/slaUtils.ts` — Live SLA countdown & breach calculation helper.
+- `src/lib/utils/` — Shared pure helpers: `secureId.ts` (Web Crypto CSPRNG IDs, zero `Math.random()`), `issueDisplay.ts` (shared priority dots, step indices, multi-token search matcher), `analyticsMetrics.ts` (SLA health score & 6-day trend math), and `slaUtils.ts`.
 
-### `src/components/` — Role-Isolated, Code-Split UI Views
-- `src/components/layout/` — `ErrorBoundary.tsx`, `TopNav.tsx`, `BionisSidebar.tsx` (sticky desktop rail + mobile slide-over drawer).
-- `src/components/auth/PortalLoginView.tsx` — Dual-Portal Sign-In Gate with 1-Click Demo Mode for both Citizens and Admins.
-- `src/components/report/ReportIssueView.tsx` — Lazy-loaded single-screen Citizen reporting studio with 4 sample presets, voice input, WebP photo uploader, and Gemini preview.
-- `src/components/map/CivicMap.tsx` — Dual-engine `@vis.gl/react-google-maps` (`AdvancedMarker`, `mapId="DEMO_MAP_ID"`, `internalUsageAttributionIds={['gmp_git_agentskills_v1']}`) + Leaflet/OSM interactive draggable pin-point map.
-- `src/components/dashboard/` — `BionisAnalyticsRow.tsx` (SLA circular ring gauge, 4 KPIs, priority bar chart, 6-day SVG spline, 3 insight cards) and lazy-loaded `TrackIssuesView.tsx`.
-- `src/components/admin/AdminDashboardView.tsx` — Lazy-loaded urgency-sorted dispatch queue with strict department lock, handover queue, auto-escalation SLA alerts, after-repair proof uploader, and audit log.
-- `src/components/spec/DimensionalSpecModal.tsx` — Lazy-loaded monochrome CAD geometry spec sheet modal.
+### `src/hooks/` & `src/components/` — Role-Isolated, Code-Split UI Views
+- `src/hooks/useScrollAtmosphere.ts` — Passive rAF scroll-driven CSS variable driver.
+- `src/components/layout/` — `ErrorBoundary.tsx`, `TopNav.tsx`, `BionisSidebar.tsx` (sticky desktop rail + Escape-dismissible mobile drawer).
+- `src/components/auth/` — `PortalLoginView.tsx`, `CitizenPortalCard.tsx`, and `AdminPortalCard.tsx` (Dual-Portal Sign-In Gate with 1-Click Demo Mode for both Citizens & Admins).
+- `src/components/report/` — Lazy-loaded `ReportIssueView.tsx`, `samplePresets.ts`, and `TriagePreviewPanel.tsx`.
+- `src/components/map/` — `CivicMap.tsx`, `mapGeocoding.ts`, and `LeafletFallbackMap.tsx` (`@vis.gl/react-google-maps` `AdvancedMarker`, `mapId="DEMO_MAP_ID"`, `internalUsageAttributionIds={['gmp_git_agentskills_v1']}` + Leaflet/OSM failover).
+- `src/components/dashboard/` — `BionisAnalyticsRow.tsx` (accessible `role="img"` SVG charts), lazy-loaded `TrackIssuesView.tsx`, and semantic `TrackIssueCard.tsx` (`role="progressbar"`, keyboard-native buttons).
+- `src/components/admin/` — Lazy-loaded `AdminDashboardView.tsx`, `AdminQueueFilters.tsx`, `AdminHandoverQueue.tsx`, `AdminAuditLogPanel.tsx`, and `AdminIssueCard.tsx`.
+- `src/components/spec/DimensionalSpecModal.tsx` — Lazy-loaded Escape-dismissible monochrome CAD geometry spec sheet dialog.
 
 ---
 

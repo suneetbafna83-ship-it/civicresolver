@@ -7,18 +7,17 @@ import {
   Sparkles,
   TrendingUp,
 } from 'lucide-react';
-import {
-  DEPARTMENTS,
-  type CivicIssue,
-  type Department,
-  type PriorityLevel,
-} from '../../../shared/types/civic.js';
+import type { CivicIssue, Department } from '../../../shared/types/civic.js';
 import {
   getUiStrings,
   translatePriority,
   type AppLanguage,
 } from '../../lib/i18n/translations.js';
-import { computeSlaStatus } from '../../lib/utils/slaUtils.js';
+import {
+  ORDERED_PRIORITY_LEVELS,
+  computeCivicAnalytics,
+  getPriorityBarColor,
+} from '../../lib/utils/analyticsMetrics.js';
 
 export interface BionisAnalyticsRowProps {
   readonly issues: ReadonlyArray<CivicIssue>;
@@ -27,32 +26,6 @@ export interface BionisAnalyticsRowProps {
   readonly language?: AppLanguage;
   readonly scopedDepartment?: Department | null;
   readonly actionSlot?: React.ReactNode;
-}
-
-interface DaySeriesPoint {
-  readonly label: string;
-  readonly reported: number;
-  readonly resolved: number;
-}
-
-const PRIORITY_LEVELS: ReadonlyArray<PriorityLevel> = [
-  'Critical',
-  'High',
-  'Medium',
-  'Low',
-];
-
-function getPriorityBarColor(level: PriorityLevel): string {
-  switch (level) {
-    case 'Critical':
-      return '#dc2626';
-    case 'High':
-      return '#d97706';
-    case 'Medium':
-      return '#3730a3';
-    case 'Low':
-      return '#0f766e';
-  }
 }
 
 export function BionisAnalyticsRow({
@@ -64,121 +37,10 @@ export function BionisAnalyticsRow({
   actionSlot,
 }: BionisAnalyticsRowProps): React.ReactElement {
   const t = getUiStrings(language);
-
-  const metrics = useMemo(() => {
-    const total = issues.length;
-    let resolved = 0;
-    let inProgress = 0;
-    let overdue = 0;
-    let urgencySum = 0;
-    let totalUpvotes = 0;
-    let topPriorityIssue: CivicIssue | null = null;
-
-    const priorityCounts = new Map<PriorityLevel, number>([
-      ['Critical', 0],
-      ['High', 0],
-      ['Medium', 0],
-      ['Low', 0],
-    ]);
-
-    for (const issue of issues) {
-      urgencySum += issue.urgencyScore;
-      totalUpvotes += issue.upvoteCount;
-      priorityCounts.set(
-        issue.priorityLevel,
-        (priorityCounts.get(issue.priorityLevel) ?? 0) + 1,
-      );
-
-      if (issue.status === 'Resolved') {
-        resolved += 1;
-      } else {
-        if (issue.status === 'In Progress') {
-          inProgress += 1;
-        }
-        const sla = computeSlaStatus(issue);
-        if (sla.isOverdue) {
-          overdue += 1;
-        }
-        if (
-          topPriorityIssue === null ||
-          issue.urgencyScore > topPriorityIssue.urgencyScore
-        ) {
-          topPriorityIssue = issue;
-        }
-      }
-    }
-
-    const open = total - resolved;
-    const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : 100;
-    const avgUrgency = total > 0 ? (urgencySum / total).toFixed(1) : '0.0';
-    const onTimeOpen = Math.max(0, open - overdue);
-    const slaHealthScore =
-      total === 0
-        ? 100
-        : Math.max(
-            18,
-            Math.min(
-              100,
-              Math.round(
-                52 +
-                  resolutionRate * 0.42 +
-                  (open > 0 ? (onTimeOpen / open) * 12 : 12) -
-                  overdue * 7,
-              ),
-            ),
-          );
-
-    const maxCreatedMs = issues.reduce((max, item) => {
-      const parsed = Date.parse(item.createdAt);
-      return Number.isFinite(parsed) && parsed > max ? parsed : max;
-    }, Date.UTC(2026, 10, 21));
-
-    const trendPoints: DaySeriesPoint[] = [];
-    for (let offset = 5; offset >= 0; offset -= 1) {
-      const dayEnd = maxCreatedMs - offset * 24 * 60 * 60 * 1000;
-      const dayStart = dayEnd - 24 * 60 * 60 * 1000;
-      let rep = 0;
-      let res = 0;
-      for (const item of issues) {
-        const createdMs = Date.parse(item.createdAt);
-        if (createdMs > dayStart && createdMs <= dayEnd) {
-          rep += 1;
-        }
-        if (item.resolvedAt) {
-          const resolvedMs = Date.parse(item.resolvedAt);
-          if (resolvedMs > dayStart && resolvedMs <= dayEnd) {
-            res += 1;
-          }
-        }
-      }
-      const d = new Date(dayEnd);
-      const label = `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
-      trendPoints.push({ label, reported: rep, resolved: res });
-    }
-
-    const deptCounts = (
-      scopedDepartment ? [scopedDepartment] : DEPARTMENTS
-    ).map((dept) => {
-      const count = issues.filter((i) => i.assignedDepartment === dept).length;
-      return { dept, count };
-    });
-
-    return {
-      total,
-      open,
-      inProgress,
-      resolved,
-      overdue,
-      resolutionRate,
-      avgUrgency,
-      totalUpvotes,
-      slaHealthScore,
-      topPriorityIssue,
-      priorityCounts,
-      trendPoints,
-      deptCounts,
-    };
-  }, [issues, scopedDepartment]);
+  const metrics = useMemo(
+    () => computeCivicAnalytics(issues, scopedDepartment),
+    [issues, scopedDepartment],
+  );
 
   const ringRadius = 42;
   const ringCircumference = 2 * Math.PI * ringRadius;
@@ -214,12 +76,10 @@ export function BionisAnalyticsRow({
   const resolvedPoints = buildCoords(
     metrics.trendPoints.map((p) => p.resolved),
   );
-
   const ringStroke = accent === 'plum' ? '#7c3aed' : '#0f766e';
 
   return (
     <div className="mb-6 flex flex-col gap-4">
-      {/* Row 1: Hero SLA Summary + Circular Ring Gauge + 4-Col KPI Strip */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="surface-card flex items-center justify-between gap-4 p-4 sm:p-5 xl:col-span-5">
           <div className="flex min-w-0 flex-col gap-1.5">
@@ -240,6 +100,7 @@ export function BionisAnalyticsRow({
 
           <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
             <svg
+              role="img"
               viewBox="0 0 104 104"
               className="h-24 w-24 -rotate-90"
               aria-label={`SLA Health Score ${metrics.slaHealthScore} out of 100`}
@@ -265,7 +126,10 @@ export function BionisAnalyticsRow({
                 strokeDashoffset={ringDashOffset.toFixed(1)}
               />
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 flex flex-col items-center justify-center text-center"
+            >
               <span className="tabular-nums text-xl font-extrabold text-[#11131a] dark:text-white">
                 {metrics.slaHealthScore}
               </span>
@@ -276,7 +140,6 @@ export function BionisAnalyticsRow({
           </div>
         </div>
 
-        {/* 4-Card KPI Strip */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:col-span-7">
           <div className="surface-card flex flex-col justify-between p-4">
             <span className="text-[11px] font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400">
@@ -342,7 +205,6 @@ export function BionisAnalyticsRow({
         </div>
       </div>
 
-      {/* Row 2: 2-Col Analytics Charts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="surface-card p-4 sm:p-5">
           <div className="mb-3 flex items-center justify-between gap-2">
@@ -360,7 +222,7 @@ export function BionisAnalyticsRow({
           </div>
 
           <div className="flex flex-col gap-2.5">
-            {PRIORITY_LEVELS.map((level) => {
+            {ORDERED_PRIORITY_LEVELS.map((level) => {
               const count = metrics.priorityCounts.get(level) ?? 0;
               const pct =
                 metrics.total > 0 ? Math.round((count / metrics.total) * 100) : 0;
@@ -399,11 +261,17 @@ export function BionisAnalyticsRow({
             </div>
             <div className="flex items-center gap-3 text-[11px] font-bold">
               <span className="inline-flex items-center gap-1 text-[#3730a3] dark:text-indigo-300">
-                <span className="h-2 w-2 rounded-full bg-[#3730a3]" />
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 rounded-full bg-[#3730a3]"
+                />
                 {t.stepReported.replace('1. ', '')}
               </span>
               <span className="inline-flex items-center gap-1 text-[#0f766e] dark:text-teal-300">
-                <span className="h-2 w-2 rounded-full bg-[#0f766e]" />
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 rounded-full bg-[#0f766e]"
+                />
                 {t.stepResolved.replace('3. ', '')}
               </span>
             </div>
@@ -411,6 +279,7 @@ export function BionisAnalyticsRow({
 
           <div className="surface-well p-2">
             <svg
+              role="img"
               viewBox={`0 0 ${svgW} ${svgH}`}
               className="h-24 w-full overflow-visible"
               aria-label="6-day reported vs resolved trend chart"
@@ -453,7 +322,6 @@ export function BionisAnalyticsRow({
         </div>
       </div>
 
-      {/* Row 3: 3-Col Tinted Insights */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-[20px] border border-indigo-200/80 bg-indigo-500/[0.08] p-4 dark:border-indigo-900/60 dark:bg-indigo-500/15">
           <div className="flex items-center gap-2 text-xs font-bold text-[#3730a3] dark:text-indigo-200">
@@ -473,7 +341,9 @@ export function BionisAnalyticsRow({
             <span>{t.civicVitalsTitle}</span>
           </div>
           <p className="tabular-nums mt-1.5 text-xs font-semibold text-[#11131a] dark:text-white">
-            {metrics.totalUpvotes} citizen impact votes · {metrics.deptCounts.length} active department queue{metrics.deptCounts.length > 1 ? 's' : ''}
+            {metrics.totalUpvotes} citizen impact votes ·{' '}
+            {metrics.activeDepartmentCount} active department queue
+            {metrics.activeDepartmentCount > 1 ? 's' : ''}
           </p>
         </div>
 

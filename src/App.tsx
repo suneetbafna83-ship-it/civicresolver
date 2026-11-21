@@ -27,6 +27,7 @@ import {
   getUiStrings,
   type AppLanguage,
 } from './lib/i18n/translations.js';
+import { useScrollAtmosphere } from './hooks/useScrollAtmosphere.js';
 import { createDefaultIssueRepository } from './lib/repositories/hybridIssueRepository.js';
 import { PortalLoginView } from './components/auth/PortalLoginView.js';
 import { BionisSidebar } from './components/layout/BionisSidebar.js';
@@ -79,42 +80,14 @@ export function App(): React.ReactElement {
     setToastMessage(msg);
   }, []);
 
-  // Scroll-Driven Cross-Shift: Lavender glides Right->Left, Sandy Cream glides Left->Right
+  // Sync document lang attribute for WCAG 3.1.1 screen-reader accuracy (en / hi / ta)
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = language;
     }
-    let rafId: number | null = null;
-    const updateScrollColor = (): void => {
-      rafId = null;
-      const el = atmosphereRef.current;
-      if (!el) {
-        return;
-      }
-      const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-      const maxRange = Math.max(
-        320,
-        document.documentElement.scrollHeight - window.innerHeight,
-      );
-      const progress = Math.min(1, Math.max(0, scrollY / maxRange));
-      el.style.setProperty('--scroll-progress', progress.toFixed(3));
-    };
+  }, [language]);
 
-    const onScroll = (): void => {
-      if (rafId === null) {
-        rafId = window.requestAnimationFrame(updateScrollColor);
-      }
-    };
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    updateScrollColor();
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      if (rafId !== null) {
-        window.cancelAnimationFrame(rafId);
-      }
-    };
-  }, [activeTab, session]);
+  useScrollAtmosphere(atmosphereRef, `${activeTab}-${session?.uid ?? 'none'}`);
 
   useEffect(() => {
     if (!toastMessage) {
@@ -285,6 +258,12 @@ export function App(): React.ReactElement {
 
   return (
     <div className={darkTheme ? 'dark' : ''}>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:rounded-full focus:bg-[#11131a] focus:px-4 focus:py-2 focus:text-xs focus:font-bold focus:text-white focus:shadow-lg dark:focus:bg-white dark:focus:text-[#11131a]"
+      >
+        Skip to main content
+      </a>
       <div
         ref={atmosphereRef}
         className={`nixtio-atmosphere overflow-x-hidden px-2.5 text-[#11131a] sm:px-5 dark:text-slate-100 ${
@@ -372,7 +351,11 @@ export function App(): React.ReactElement {
               )}
 
               {/* 60fps Compositor-Only Tab Panel Transition + Lazy Code-Split Suspense */}
-              <main className="flex-1 overflow-x-hidden overflow-y-auto lg:overflow-y-visible">
+              <main
+                id="main-content"
+                tabIndex={-1}
+                className="flex-1 overflow-x-hidden overflow-y-auto focus:outline-none lg:overflow-y-visible"
+              >
                 <div
                   key={viewTransitionKey}
                   className="tab-transition-enter h-full"

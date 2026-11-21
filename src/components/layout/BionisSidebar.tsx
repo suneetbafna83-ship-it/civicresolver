@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Building2,
   ClipboardList,
@@ -53,6 +53,19 @@ export function BionisSidebar({
     onSelectTab(tab);
     onCloseMobile();
   };
+
+  useEffect(() => {
+    if (!isOpenMobile || typeof window === 'undefined') {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        onCloseMobile();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpenMobile, onCloseMobile]);
 
   return (
     <>

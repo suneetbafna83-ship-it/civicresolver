@@ -358,4 +358,56 @@ describe('AuthService', () => {
       ),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
+
+  it('rejects wrong passwords for existing Firebase and offline PBKDF2 citizen accounts without bypass', async () => {
+    // 1. Firebase existing email rejecting wrong password must NOT fall back to a bypass session
+    const { mockAuth, fns } = createMockFirebaseAuthFns();
+    vi.mocked(fns.signInWithEmailAndPassword).mockRejectedValueOnce(
+      Object.assign(new Error('Invalid credentials'), { code: 'auth/invalid-credential' }),
+    );
+    vi.mocked(fns.createUserWithEmailAndPassword).mockRejectedValueOnce(
+      Object.assign(new Error('Email already in use'), { code: 'auth/email-already-in-use' }),
+    );
+    const firebaseService = createAuthService({
+      isFirebaseConfigured: () => true,
+      getAuthInstance: () => mockAuth,
+      sessionStorage: createInMemoryAuthStorage(),
+      firebaseAuthFns: fns,
+    });
+    await expect(
+      firebaseService.signInWithEmail('existing@example.com', 'WrongPass999'),
+    ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
+
+    // 2. Offline local PBKDF2 vault verifies stored password hash strictly
+    const offlineStorage = createInMemoryAuthStorage();
+    const offlineService = createAuthService({
+      isFirebaseConfigured: () => false,
+      getAuthInstance: () => null,
+      sessionStorage: offlineStorage,
+    });
+    const created = await offlineService.signUpWithEmail(
+      'local.citizen@example.com',
+      'RightPass#2026',
+      'Local Citizen',
+    );
+    expect(created.email).toBe('local.citizen@example.com');
+
+    await expect(
+      offlineService.signInWithEmail('local.citizen@example.com', 'WrongPass#999'),
+    ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
+
+    await expect(
+      offlineService.signUpWithEmail(
+        'local.citizen@example.com',
+        'DifferentPass#999',
+        'Impostor',
+      ),
+    ).rejects.toMatchObject({ code: 'EMAIL_IN_USE' });
+
+    const verified = await offlineService.signInWithEmail(
+      'local.citizen@example.com',
+      'RightPass#2026',
+    );
+    expect(verified.uid).toBe(created.uid);
+  });
 });

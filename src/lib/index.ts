@@ -12,4 +12,7 @@ export * from './repositories/issueRepository.js';
 export * from './repositories/firestoreIssueRepository.js';
 export * from './repositories/localIssueRepository.js';
 export * from './repositories/hybridIssueRepository.js';
+export * from './utils/analyticsMetrics.js';
+export * from './utils/issueDisplay.js';
+export * from './utils/secureId.js';
 export * from './utils/slaUtils.js';

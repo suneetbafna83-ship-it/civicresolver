@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DepartmentSchema } from '../../../shared/schemas/triage.js';
 import type { Department } from '../../../shared/types/civic.js';
+import { generateSecureId } from '../utils/secureId.js';
 
 export type TransferRequestStatus = 'Pending' | 'Approved' | 'Rejected';
 
@@ -123,7 +124,7 @@ export function createTransferRequest(input: {
 }): DepartmentTransferRequest[] {
   const existing = loadTransferRequests();
   const next: DepartmentTransferRequest = {
-    id: `tr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    id: generateSecureId('tr'),
     issueId: stripUnsafeText(input.issueId, 128) || 'unknown',
     issueTitle: stripUnsafeText(input.issueTitle, 160) || 'Civic Issue',
     fromDepartment: input.fromDepartment,
@@ -189,7 +190,7 @@ export function appendAuditEntry(input: {
 }): MunicipalAuditEntry[] {
   const existing = loadAuditLog();
   const entry: MunicipalAuditEntry = {
-    id: `aud_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    id: generateSecureId('aud'),
     issueId: stripUnsafeText(input.issueId, 128) || 'unknown',
     issueTitle: stripUnsafeText(input.issueTitle, 160) || 'Civic Issue',
     actorName: stripUnsafeText(input.actorName, 80) || 'Municipal Officer',
