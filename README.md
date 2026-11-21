@@ -2,6 +2,9 @@
 
 CivicResolve is a zero-cost, resilient municipal issue reporting, multimodal AI triage, and department-scoped dispatch command platform built with **React 19 + TypeScript (strict, 0 `any`) + Tailwind CSS**, **Google Gemini (`@google/genai`)**, **Firebase Spark Plan (`firebase/auth` + `firebase/firestore` + hardened `firestore.rules`)**, and **Google Maps Platform (`@vis.gl/react-google-maps` + `AdvancedMarkerElement`)**.
 
+- **Live Cloud Deployment (Firebase Hosting):** https://civic-sense-43d74.web.app
+- **GitHub Repository:** https://github.com/suneetbafna83-ship-it/civicresolver
+
 ---
 
 ## 7-Parameter Hackathon Evaluation Rubric Alignment
