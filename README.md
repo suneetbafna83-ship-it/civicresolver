@@ -4,6 +4,7 @@ CivicResolve is a zero-cost, resilient municipal issue reporting, multimodal AI 
 
 - **Live Cloud Deployment (Firebase Hosting):** https://civic-sense-43d74.web.app
 - **GitHub Repository:** https://github.com/suneetbafna83-ship-it/civicresolver
+- **Complete Codebase & Security Map:** [ARCHITECTURE.md](./ARCHITECTURE.md)
 
 ---
 

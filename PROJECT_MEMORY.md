@@ -5,7 +5,8 @@
 
 ## Workspace File Inventory (Excluding `node_modules` / `dist`)
 - **Config & Rules:**
-  - `AGENTS.md`, `PROJECT_MEMORY.md`, `.agents/skills/civic-evaluator-guard/SKILL.md`
+  - `AGENTS.md`, `PROJECT_MEMORY.md`, `README.md`, `ARCHITECTURE.md`, `.agents/skills/civic-evaluator-guard/SKILL.md`
+  - `shared/index.ts`, `src/lib/index.ts`, `src/components/layout/ErrorBoundary.tsx`
   - `package.json`, `tsconfig.json`, `vite.config.ts`, `eslint.config.mjs`, `vitest.config.ts`, `vercel.json`, `index.html`, `.env.example`, `.env` (git-ignored), `.gitignore`
   - `.firebaserc` (`civic-sense-43d74`), `firebase.json`, `firestore.rules`, `firestore.indexes.json`
 - **Shared Contracts & Zod Schemas (`shared/`):**
