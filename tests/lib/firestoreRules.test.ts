@@ -106,6 +106,13 @@ describe('Spark Plan Firestore Rules, Indexes & Config Compliance', () => {
     expect(rulesText).toContain('allow get: if isOwner(uid);');
     expect(rulesText).toContain('allow list, write: if false;');
 
+    expect(rulesText).toContain('function getAdminDepartment()');
+    expect(rulesText).toContain('function isAuthorizedAdminDepartment(');
+    expect(rulesText).toContain('function isAuthorizedAdminListScope()');
+    expect(rulesText).toMatch(
+      /isAuthorizedAdminDepartment\(\s*resource\.data\.assignedDepartment,\s*request\.resource\.data\.assignedDepartment\s*\)/,
+    );
+
     expect(rulesText).toContain(
       "prevStatus == 'Reported' && nextStatus in ['Reported', 'In Progress', 'Resolved']",
     );

@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Clock,
   Download,
+  Filter,
   Image as ImageIcon,
   MapPin,
   Search,
@@ -24,6 +25,7 @@ import {
 } from '../../lib/i18n/translations.js';
 import { computeSlaStatus } from '../../lib/utils/slaUtils.js';
 import { CivicMap } from '../map/CivicMap.js';
+import { BionisAnalyticsRow } from './BionisAnalyticsRow.js';
 
 function getPriorityDotClass(priority: PriorityLevel): string {
   switch (priority) {
@@ -77,27 +79,6 @@ export function TrackIssuesView({
     issues[0]?.id ?? null,
   );
 
-  const counts = useMemo(() => {
-    let reported = 0;
-    let inProgress = 0;
-    let resolved = 0;
-    for (const item of issues) {
-      if (item.status === 'Reported') {
-        reported += 1;
-      } else if (item.status === 'In Progress') {
-        inProgress += 1;
-      } else if (item.status === 'Resolved') {
-        resolved += 1;
-      }
-    }
-    return {
-      total: issues.length,
-      reported,
-      inProgress,
-      resolved,
-    };
-  }, [issues]);
-
   const filteredIssues = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return issues.filter((issue) => {
@@ -119,68 +100,33 @@ export function TrackIssuesView({
   return (
     <section
       aria-labelledby="track-heading"
-      className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8"
+      className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6"
     >
-      {/* Editorial Two-Tone Header + 4-Card KPI Strip */}
-      <div className="mb-8 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-        <div>
-          <h1
-            id="track-heading"
-            className="text-2xl font-bold tracking-tight sm:text-3xl"
-          >
-            <span className="text-slate-500 dark:text-slate-400">
-              {t.trackLead}{' '}
-            </span>
-            <span className="text-[#11131a] dark:text-white">
-              {t.trackTitle}
-            </span>
-          </h1>
-          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-            Follow every report with live SLA countdowns, before/after photo proof, and official downloadable receipts.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="surface-card px-4 py-3">
-            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-              Total Reports
-            </span>
-            <p className="tabular-nums mt-0.5 text-xl font-bold text-[#11131a] dark:text-white">
-              {counts.total}
-            </p>
-          </div>
-          <div className="surface-card px-4 py-3">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
-              <span className="h-2 w-2 rounded-full bg-amber-600" />
-              Reported
-            </span>
-            <p className="tabular-nums mt-0.5 text-xl font-bold text-[#11131a] dark:text-white">
-              {counts.reported}
-            </p>
-          </div>
-          <div className="surface-card px-4 py-3">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
-              <span className="h-2 w-2 rounded-full bg-indigo-700" />
-              In Progress
-            </span>
-            <p className="tabular-nums mt-0.5 text-xl font-bold text-[#11131a] dark:text-white">
-              {counts.inProgress}
-            </p>
-          </div>
-          <div className="surface-card px-4 py-3">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
-              <span className="h-2 w-2 rounded-full bg-emerald-600" />
-              Resolved
-            </span>
-            <p className="tabular-nums mt-0.5 text-xl font-bold text-[#11131a] dark:text-white">
-              {counts.resolved}
-            </p>
-          </div>
-        </div>
+      {/* Header */}
+      <div className="mb-5">
+        <h1
+          id="track-heading"
+          className="text-xl font-bold tracking-tight sm:text-2xl"
+        >
+          <span className="text-slate-500 dark:text-slate-400">
+            {t.trackLead}{' '}
+          </span>
+          <span className="text-[#11131a] dark:text-white">{t.trackTitle}</span>
+        </h1>
+        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-700 sm:text-sm dark:text-slate-300">
+          Follow every report with live SLA countdowns, before/after photo proof, and official downloadable receipts.
+        </p>
       </div>
 
-      {/* Filter Bar (Teal-Tinted Active Status Pills) */}
-      <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
+      {/* Bionis Hero SLA Gauge + 4 KPI Cards + 2 Analytics Charts + 3 Insights */}
+      <BionisAnalyticsRow
+        issues={issues}
+        scopeLabel="Citizen Transparency Pulse"
+        accent="teal"
+      />
+
+      {/* Refero-Inspired Filter Pills + Search */}
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div
           role="group"
           aria-label="Filter complaints by status"
@@ -193,13 +139,14 @@ export function TrackIssuesView({
                 key={status}
                 type="button"
                 onClick={() => setStatusFilter(status)}
-                className={`press-feedback min-h-[36px] rounded-full px-4 py-1.5 text-xs font-semibold ${
+                className={`press-feedback inline-flex min-h-[38px] items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold ${
                   active
                     ? 'bg-[#0f766e] text-white shadow-xs'
                     : 'border border-slate-300 bg-white text-[#11131a] hover:bg-teal-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white'
                 }`}
               >
-                {status === 'ALL' ? 'All Statuses' : status}
+                <Filter className="h-3 w-3 opacity-80" aria-hidden="true" />
+                <span>{status === 'ALL' ? 'All Statuses' : status}</span>
               </button>
             );
           })}
@@ -208,7 +155,7 @@ export function TrackIssuesView({
         <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
           <div className="relative flex-1 sm:flex-none">
             <Search
-              className="pointer-events-none absolute top-2.5 left-3.5 h-4 w-4 text-slate-500"
+              className="pointer-events-none absolute top-3 left-3.5 h-4 w-4 text-slate-500"
               aria-hidden="true"
             />
             <input
@@ -217,7 +164,7 @@ export function TrackIssuesView({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search street, title, or department..."
-              className="w-full rounded-full border border-slate-300 bg-white py-2 pr-4 pl-10 text-xs font-medium text-[#11131a] placeholder:text-slate-500 sm:w-64 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
+              className="min-h-[38px] w-full rounded-full border border-slate-300 bg-white py-1.5 pr-4 pl-10 text-xs font-medium text-[#11131a] placeholder:text-slate-500 sm:w-64 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
             />
           </div>
 
@@ -227,7 +174,7 @@ export function TrackIssuesView({
             onChange={(e) =>
               setCategoryFilter(e.target.value as IssueCategory | 'ALL')
             }
-            className="rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-[#11131a] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+            className="min-h-[38px] rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-[#11131a] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
           >
             <option value="ALL">All Categories</option>
             {ISSUE_CATEGORIES.map((cat) => (
@@ -239,11 +186,11 @@ export function TrackIssuesView({
         </div>
       </div>
 
-      {/* Main Split Workspace */}
-      <div className="grid grid-cols-1 gap-7 lg:grid-cols-12">
-        <div className="flex flex-col gap-6 lg:col-span-7">
+      {/* Main Split Workspace (Responsive List + Overview Map) */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="flex flex-col gap-5 lg:col-span-7">
           {filteredIssues.length === 0 ? (
-            <div className="surface-card p-10 text-center">
+            <div className="surface-card p-8 text-center">
               <p className="text-base font-bold text-[#11131a] dark:text-white">
                 No complaints match the current filter
               </p>
@@ -265,7 +212,7 @@ export function TrackIssuesView({
                 <article
                   key={issue.id}
                   onClick={() => setSelectedIssueId(issue.id)}
-                  className={`surface-card cursor-pointer p-5 transition-all sm:p-6 ${
+                  className={`surface-card cursor-pointer p-4 transition-all sm:p-6 ${
                     isSelected
                       ? 'ring-2 ring-[#0f766e]'
                       : 'hover:border-slate-300 dark:hover:border-slate-700'
@@ -311,7 +258,7 @@ export function TrackIssuesView({
                     {issue.description}
                   </p>
 
-                  <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
                     <span className="inline-flex items-center gap-1">
                       <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
                       {issue.location.address}
@@ -322,7 +269,7 @@ export function TrackIssuesView({
                     </span>
                   </div>
 
-                  {/* Before & After Photo Proof Viewer (when photos attached) */}
+                  {/* Before & After Photo Proof Viewer */}
                   {(issue.imageDataUrl || afterPhoto) && (
                     <div className="surface-well mt-4 grid grid-cols-1 gap-3 p-3 sm:grid-cols-2">
                       {issue.imageDataUrl && (
@@ -354,7 +301,7 @@ export function TrackIssuesView({
                     </div>
                   )}
 
-                  {/* Concentric Inner Progress Well: 3-Step Visual Tracker */}
+                  {/* Concentric Inner Progress Well */}
                   <div className="surface-well mt-4 p-3.5">
                     <div className="flex items-center justify-between text-xs font-bold">
                       <span
@@ -421,18 +368,18 @@ export function TrackIssuesView({
                     )}
                   </div>
 
-                  {/* Card Footer: Official Receipt + Upvote Pill */}
+                  {/* Card Footer */}
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
                     <span>Reported by {issue.reporterDisplayName}</span>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           downloadOfficialReceipt(issue);
                         }}
-                        className="press-feedback inline-flex min-h-[34px] items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-[#11131a] hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        className="press-feedback inline-flex min-h-[38px] items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-[#11131a] hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                       >
                         <Download className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>{t.receiptBtn}</span>
@@ -445,7 +392,7 @@ export function TrackIssuesView({
                           e.stopPropagation();
                           void onUpvoteIssue(issue.id);
                         }}
-                        className={`press-feedback inline-flex min-h-[34px] items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold ${
+                        className={`press-feedback inline-flex min-h-[38px] items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold ${
                           hasVoted
                             ? 'bg-slate-200 text-[#11131a] dark:bg-slate-800 dark:text-white'
                             : 'bg-[#0f766e] text-white hover:opacity-90'
@@ -466,7 +413,7 @@ export function TrackIssuesView({
 
         {/* Right Column: Live Overview Map */}
         <div className="lg:col-span-5">
-          <div className="surface-card sticky top-6 p-5">
+          <div className="surface-card sticky top-4 p-4 sm:p-5">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-base font-bold text-[#11131a] dark:text-white">
                 Community Issue Map
@@ -481,7 +428,7 @@ export function TrackIssuesView({
               issues={filteredIssues}
               selectedIssueId={selectedIssueId}
               onSelectIssue={setSelectedIssueId}
-              heightClassName="h-[420px]"
+              heightClassName="h-[300px] sm:h-[400px]"
             />
           </div>
         </div>

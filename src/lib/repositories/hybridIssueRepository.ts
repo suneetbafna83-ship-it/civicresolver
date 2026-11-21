@@ -14,9 +14,11 @@ import {
 } from '../firebase/config.js';
 import {
   RepositoryError,
+  applyDepartmentReadScope,
+  assertDepartmentReadAccess,
+  assertDepartmentWriteScope,
   assertValidStatusTransition,
   cloneCivicIssue,
-  validateFilterOptions,
   validateIssueCreateInput,
   validateIssueUpdateInput,
   type IssueRepository,
@@ -154,33 +156,41 @@ export class HybridIssueRepository implements IssueRepository {
     return 'local';
   }
 
-  public async listIssues(options?: IssueFilterOptions): Promise<CivicIssue[]> {
-    const filter = validateFilterOptions(options);
+  public async listIssues(
+    options?: IssueFilterOptions,
+    session?: CivicSession,
+  ): Promise<CivicIssue[]> {
+    const filter = applyDepartmentReadScope(options, session);
 
     let baseIssues: CivicIssue[];
     if (this.getStorageMode() === 'firestore' && this.firestoreRepo !== null) {
       try {
-        baseIssues = await this.firestoreRepo.listIssues(filter);
+        baseIssues = await this.firestoreRepo.listIssues(filter, session);
       } catch (error) {
         if (isFirestoreFailoverError(error)) {
           this.tripFailover();
-          baseIssues = await this.localRepo.listIssues(filter);
+          baseIssues = await this.localRepo.listIssues(filter, session);
         } else if (isPermissionDeniedError(error)) {
-          baseIssues = await this.localRepo.listIssues(filter);
+          baseIssues = await this.localRepo.listIssues(filter, session);
         } else {
           throw error;
         }
       }
     } else {
-      baseIssues = await this.localRepo.listIssues(filter);
+      baseIssues = await this.localRepo.listIssues(filter, session);
     }
 
+    const filteredBase =
+      filter.department !== undefined
+        ? baseIssues.filter((issue) => issue.assignedDepartment === filter.department)
+        : baseIssues;
+
     if (this.previewSandboxIssues.size === 0) {
-      return baseIssues.map(cloneCivicIssue);
+      return filteredBase.map(cloneCivicIssue);
     }
 
     const mergedById = new Map<string, CivicIssue>();
-    for (const issue of baseIssues) {
+    for (const issue of filteredBase) {
       mergedById.set(issue.id, cloneCivicIssue(issue));
     }
     for (const [id, sandboxIssue] of this.previewSandboxIssues.entries()) {
@@ -201,31 +211,41 @@ export class HybridIssueRepository implements IssueRepository {
     return combined.slice(0, filter.limitCount).map(cloneCivicIssue);
   }
 
-  public async getIssueById(id: string): Promise<CivicIssue | null> {
+  public async getIssueById(
+    id: string,
+    session?: CivicSession,
+  ): Promise<CivicIssue | null> {
     if (id.trim().length === 0) {
       return null;
     }
     const sandboxed = this.previewSandboxIssues.get(id);
     if (sandboxed !== undefined) {
+      assertDepartmentReadAccess(sandboxed.assignedDepartment, session);
       return cloneCivicIssue(sandboxed);
     }
 
+    let found: CivicIssue | null;
     if (this.getStorageMode() === 'firestore' && this.firestoreRepo !== null) {
       try {
-        return await this.firestoreRepo.getIssueById(id);
+        found = await this.firestoreRepo.getIssueById(id, session);
       } catch (error) {
         if (isFirestoreFailoverError(error)) {
           this.tripFailover();
-          return this.localRepo.getIssueById(id);
+          found = await this.localRepo.getIssueById(id, session);
+        } else if (isPermissionDeniedError(error)) {
+          found = await this.localRepo.getIssueById(id, session);
+        } else {
+          throw error;
         }
-        if (isPermissionDeniedError(error)) {
-          return this.localRepo.getIssueById(id);
-        }
-        throw error;
       }
+    } else {
+      found = await this.localRepo.getIssueById(id, session);
     }
 
-    return this.localRepo.getIssueById(id);
+    if (found !== null) {
+      assertDepartmentReadAccess(found.assignedDepartment, session);
+    }
+    return found;
   }
 
   public async createIssue(
@@ -301,7 +321,7 @@ export class HybridIssueRepository implements IssueRepository {
 
     if (this.getStorageMode() === 'firestore' && this.firestoreRepo !== null) {
       if (isUnverifiedPreviewAdmin(session)) {
-        return this.updateInSandbox(issueId, validatedPatch);
+        return this.updateInSandbox(issueId, validatedPatch, session);
       }
 
       try {
@@ -413,11 +433,18 @@ export class HybridIssueRepository implements IssueRepository {
   private async updateInSandbox(
     issueId: string,
     validatedPatch: IssueAdminUpdateInput,
+    session: CivicSession,
   ): Promise<CivicIssue> {
     const existing = await this.resolveTargetIssueForSandbox(issueId);
     if (existing === null) {
       throw new RepositoryError('NOT_FOUND', `Issue "${issueId}" was not found`);
     }
+
+    assertDepartmentWriteScope(
+      existing.assignedDepartment,
+      validatedPatch.assignedDepartment,
+      session,
+    );
 
     const nextStatus = validatedPatch.status ?? existing.status;
     if (validatedPatch.status !== undefined) {

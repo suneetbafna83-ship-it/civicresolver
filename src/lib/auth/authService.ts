@@ -15,16 +15,24 @@ import {
   type UserCredential,
 } from 'firebase/auth';
 import { z } from 'zod';
-import type { AuthProviderKind, CivicSession } from '../../../shared/types/civic.js';
-import { safeCivicText } from '../../../shared/schemas/triage.js';
+import type {
+  AuthProviderKind,
+  CivicSession,
+  Department,
+} from '../../../shared/types/civic.js';
+import { DepartmentSchema, safeCivicText } from '../../../shared/schemas/triage.js';
 import {
   getFirebaseAuth,
   getFirebaseDb,
   isFirebaseConfigured,
 } from '../firebase/config.js';
-import { isVerifiedAdminUid } from '../repositories/firestoreIssueRepository.js';
+import {
+  getVerifiedAdminProfile,
+  isVerifiedAdminUid,
+} from '../repositories/firestoreIssueRepository.js';
 
 export const PREVIEW_ADMIN_STORAGE_KEY = 'civicresolve.previewAdmin.v1';
+export const PREVIEW_ADMIN_DEPT_STORAGE_KEY = 'civicresolve.previewAdminDept.v1';
 export const LOCAL_GUEST_STORAGE_KEY = 'civicresolve.localGuest.v1';
 
 export type AuthServiceErrorCode =
@@ -36,6 +44,7 @@ export type AuthServiceErrorCode =
   | 'WEAK_PASSWORD'
   | 'NETWORK_ERROR'
   | 'INVALID_INPUT'
+  | 'FORBIDDEN'
   | 'AUTH_ERROR';
 
 export class AuthServiceError extends Error {
@@ -117,6 +126,10 @@ export interface AuthServiceDeps {
     uid: string,
     tokenClaims?: Record<string, unknown>,
   ) => Promise<boolean>;
+  readonly resolveAdminDepartment?: (
+    uid: string,
+    tokenClaims?: Record<string, unknown>,
+  ) => Promise<Department | null>;
   readonly sessionStorage?: StorageLike;
   readonly firebaseAuthFns?: FirebaseAuthFns;
   readonly idGenerator?: () => string;
@@ -128,13 +141,18 @@ export interface AuthService {
   signInWithGoogle(): Promise<CivicSession | null>;
   completeGoogleRedirect(): Promise<CivicSession | null>;
   signInWithEmail(email: string, password: string): Promise<CivicSession>;
+  signInDepartmentOfficer(
+    email: string,
+    password: string,
+    expectedDepartment?: Department | null,
+  ): Promise<CivicSession>;
   signUpWithEmail(
     email: string,
     password: string,
     displayName?: string,
   ): Promise<CivicSession>;
   signInAsGuest(): Promise<CivicSession>;
-  enterPreviewAdminMode(): Promise<CivicSession>;
+  enterPreviewAdminMode(department?: Department | null): Promise<CivicSession>;
   signOut(): Promise<void>;
   getCurrentSession(): Promise<CivicSession | null>;
   onAuthStateChange(listener: AuthStateListener): Unsubscribe;
@@ -250,6 +268,24 @@ async function defaultCheckVerifiedAdmin(
   return isVerifiedAdminUid(uid, db);
 }
 
+async function defaultResolveAdminDepartment(
+  uid: string,
+  tokenClaims?: Record<string, unknown>,
+): Promise<Department | null> {
+  if (tokenClaims !== undefined && typeof tokenClaims.department === 'string') {
+    const parsedClaim = DepartmentSchema.safeParse(tokenClaims.department);
+    if (parsedClaim.success) {
+      return parsedClaim.data;
+    }
+  }
+  const db = getFirebaseDb();
+  if (db === null) {
+    return null;
+  }
+  const profile = await getVerifiedAdminProfile(uid, db);
+  return profile.isAdmin ? profile.department : null;
+}
+
 function defaultGuestIdGenerator(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return `guest_${crypto.randomUUID()}`;
@@ -347,12 +383,20 @@ function inferProviderKind(user: AuthUserLike): AuthProviderKind {
   return 'password';
 }
 
-function buildPreviewAdminSession(): CivicSession {
+function buildPreviewAdminSession(
+  department: Department | null = null,
+  customDisplayName?: string,
+): CivicSession {
+  const defaultName =
+    department !== null
+      ? `${department} Staff (Demo)`
+      : 'City Ops Super Admin (Demo)';
   return {
     uid: 'preview-admin',
-    displayName: 'Preview Admin (Demo)',
+    displayName: customDisplayName ?? defaultName,
     email: null,
     role: 'admin',
+    assignedDepartment: department,
     provider: 'preview-admin',
     isAnonymous: false,
     isPreviewAdmin: true,
@@ -367,6 +411,7 @@ function buildLocalGuestSession(uid: string, displayName: string): CivicSession 
     displayName,
     email: null,
     role: 'citizen',
+    assignedDepartment: null,
     provider: 'local-guest',
     isAnonymous: true,
     isPreviewAdmin: false,
@@ -380,6 +425,8 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
   const getAuthInstanceFn = deps?.getAuthInstance ?? getFirebaseAuth;
   const checkVerifiedAdminFn =
     deps?.checkVerifiedAdmin ?? defaultCheckVerifiedAdmin;
+  const resolveAdminDepartmentFn =
+    deps?.resolveAdminDepartment ?? defaultResolveAdminDepartment;
   const storage = deps?.sessionStorage ?? resolveSessionStorage();
   const fns = deps?.firebaseAuthFns ?? defaultFirebaseAuthFns;
   const guestIdGenerator = deps?.idGenerator ?? defaultGuestIdGenerator;
@@ -397,6 +444,7 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
   function clearLocalSessionFlags(): void {
     try {
       storage.removeItem(PREVIEW_ADMIN_STORAGE_KEY);
+      storage.removeItem(PREVIEW_ADMIN_DEPT_STORAGE_KEY);
       storage.removeItem(LOCAL_GUEST_STORAGE_KEY);
     } catch {
       // Ignore storage access errors
@@ -408,6 +456,19 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
       return storage.getItem(PREVIEW_ADMIN_STORAGE_KEY) === 'true';
     } catch {
       return false;
+    }
+  }
+
+  function readPreviewAdminDepartment(): Department | null {
+    try {
+      const raw = storage.getItem(PREVIEW_ADMIN_DEPT_STORAGE_KEY);
+      if (raw === null) {
+        return null;
+      }
+      const parsed = DepartmentSchema.safeParse(raw);
+      return parsed.success ? parsed.data : null;
+    } catch {
+      return null;
     }
   }
 
@@ -446,6 +507,9 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
     const isVerifiedFirebaseAdmin = user.isAnonymous
       ? false
       : await checkVerifiedAdminFn(user.uid, tokenClaims);
+    const assignedDepartment = isVerifiedFirebaseAdmin
+      ? await resolveAdminDepartmentFn(user.uid, tokenClaims)
+      : null;
 
     const provider = overrideProvider ?? inferProviderKind(user);
     const defaultName = user.isAnonymous
@@ -462,6 +526,7 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
       displayName: resolvedDisplayName,
       email: user.email ?? null,
       role: isVerifiedFirebaseAdmin ? 'admin' : 'citizen',
+      assignedDepartment,
       provider,
       isAnonymous: user.isAnonymous,
       isPreviewAdmin: false,
@@ -495,7 +560,7 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
 
   async function getCurrentSession(): Promise<CivicSession | null> {
     if (readPreviewAdminActive()) {
-      return buildPreviewAdminSession();
+      return buildPreviewAdminSession(readPreviewAdminDepartment());
     }
     const client = isConfiguredFn() ? getAuthInstanceFn() : null;
     if (client?.currentUser !== null && client?.currentUser !== undefined) {
@@ -574,6 +639,75 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
       } catch (error) {
         throw mapFirebaseAuthError(error);
       }
+    },
+
+    async signInDepartmentOfficer(
+      email: string,
+      password: string,
+      expectedDepartment?: Department | null,
+    ): Promise<CivicSession> {
+      const emailParsed = EmailSchema.safeParse(email);
+      if (!emailParsed.success) {
+        throw new AuthServiceError(
+          'INVALID_INPUT',
+          emailParsed.error.issues[0]?.message ?? 'Invalid officer email address',
+        );
+      }
+      if (password.length === 0) {
+        throw new AuthServiceError('INVALID_INPUT', 'Officer passcode is required');
+      }
+
+      const client = requireConfiguredAuth();
+      let cred: { readonly user: AuthUserLike };
+      try {
+        cred = await fns.signInWithEmailAndPassword(
+          client,
+          emailParsed.data,
+          password,
+        );
+      } catch (error) {
+        throw mapFirebaseAuthError(error);
+      }
+
+      clearLocalSessionFlags();
+      const mapped = await mapFirebaseUserToSession(cred.user, 'password');
+      if (mapped.role !== 'admin' || !mapped.isVerifiedFirebaseAdmin) {
+        await fns.signOut(client).catch(() => undefined);
+        throw new AuthServiceError(
+          'FORBIDDEN',
+          'Access denied: account lacks verified municipal staff clearance in admins/{uid}.',
+        );
+      }
+
+      const assignedDept = mapped.assignedDepartment ?? null;
+      if (expectedDepartment === null && assignedDept !== null) {
+        await fns.signOut(client).catch(() => undefined);
+        throw new AuthServiceError(
+          'FORBIDDEN',
+          `Access denied: your account is restricted to ${assignedDept} and cannot open City-Wide Admin.`,
+        );
+      }
+      if (
+        expectedDepartment !== undefined &&
+        expectedDepartment !== null &&
+        assignedDept !== null &&
+        assignedDept !== expectedDepartment
+      ) {
+        await fns.signOut(client).catch(() => undefined);
+        throw new AuthServiceError(
+          'FORBIDDEN',
+          `Access denied: officer is authorized only for ${assignedDept}, not ${expectedDepartment}.`,
+        );
+      }
+
+      const effectiveDepartment =
+        assignedDept !== null ? assignedDept : (expectedDepartment ?? null);
+      const scopedSession: CivicSession = {
+        ...mapped,
+        assignedDepartment: effectiveDepartment,
+      };
+      notifyListeners(scopedSession);
+      return scopedSession;
     },
 
     async signUpWithEmail(
@@ -669,14 +803,32 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
       return guestSession;
     },
 
-    async enterPreviewAdminMode(): Promise<CivicSession> {
+    async enterPreviewAdminMode(
+      department?: Department | null,
+    ): Promise<CivicSession> {
+      let validatedDept: Department | null = null;
+      if (department !== undefined && department !== null) {
+        const parsedDept = DepartmentSchema.safeParse(department);
+        if (!parsedDept.success) {
+          throw new AuthServiceError(
+            'INVALID_INPUT',
+            `Invalid department "${department}" for admin preview scope.`,
+          );
+        }
+        validatedDept = parsedDept.data;
+      }
       try {
         storage.removeItem(LOCAL_GUEST_STORAGE_KEY);
         storage.setItem(PREVIEW_ADMIN_STORAGE_KEY, 'true');
+        if (validatedDept !== null) {
+          storage.setItem(PREVIEW_ADMIN_DEPT_STORAGE_KEY, validatedDept);
+        } else {
+          storage.removeItem(PREVIEW_ADMIN_DEPT_STORAGE_KEY);
+        }
       } catch {
         // Ignore storage errors
       }
-      const session = buildPreviewAdminSession();
+      const session = buildPreviewAdminSession(validatedDept);
       notifyListeners(session);
       return session;
     },
@@ -754,6 +906,12 @@ export const signInWithEmail = (
   email: string,
   password: string,
 ): Promise<CivicSession> => authService.signInWithEmail(email, password);
+export const signInDepartmentOfficer = (
+  email: string,
+  password: string,
+  expectedDepartment?: Department | null,
+): Promise<CivicSession> =>
+  authService.signInDepartmentOfficer(email, password, expectedDepartment);
 export const signUpWithEmail = (
   email: string,
   password: string,
@@ -762,8 +920,9 @@ export const signUpWithEmail = (
   authService.signUpWithEmail(email, password, displayName);
 export const signInAsGuest = (): Promise<CivicSession> =>
   authService.signInAsGuest();
-export const enterPreviewAdminMode = (): Promise<CivicSession> =>
-  authService.enterPreviewAdminMode();
+export const enterPreviewAdminMode = (
+  department?: Department | null,
+): Promise<CivicSession> => authService.enterPreviewAdminMode(department);
 export const signOut = (): Promise<void> => authService.signOut();
 export const getCurrentSession = (): Promise<CivicSession | null> =>
   authService.getCurrentSession();

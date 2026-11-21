@@ -195,4 +195,43 @@ describe('CivicResolve Phase 2 Frontend UI, Dual-Portal Login & Strict Workspace
       expect(screen.getByText(/स्थानीय समस्या की रिपोर्ट करें/i)).toBeDefined();
     });
   });
+
+  it('scopes Water & Sewage Staff Demo exclusively to Water & Sewage tasks and renders mobile drawer controls', async () => {
+    render(<App />);
+
+    const waterStaffBtn = screen.getByRole('button', {
+      name: /Water Dept Staff Only \(Demo\)/i,
+    });
+    fireEvent.click(waterStaffBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: /Municipal Admin Command Desk/i }),
+      ).toBeDefined();
+      expect(
+        screen.getAllByText(/Water & Sewage/i).length,
+      ).toBeGreaterThan(0);
+    });
+
+    // Mobile drawer navigation button exists in DOM
+    expect(
+      screen.getByRole('button', { name: /Open navigation menu/i }),
+    ).toBeDefined();
+
+    // Non-Water issues from seeded dataset (Roads, Sanitation) MUST NOT be shown to Water & Sewage staff
+    expect(
+      screen.queryByText(/Deep cratered pothole on Oak & 5th intersection/i),
+    ).toBeNull();
+    expect(
+      screen.queryByText(/Uncollected overflowing waste bins near Pier 3 market/i),
+    ).toBeNull();
+
+    // Multi-department filter buttons (All Departments / Roads & Infrastructure tabs) MUST NOT be exposed
+    expect(
+      screen.queryByRole('button', { name: /^All Departments$/i }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /^Roads & Infrastructure$/i }),
+    ).toBeNull();
+  });
 });

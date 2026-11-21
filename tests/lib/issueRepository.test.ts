@@ -721,4 +721,103 @@ describe('HybridIssueRepository', () => {
     const fetched = await hybrid.getIssueById('remote-issue-1');
     expect(fetched?.status).toBe('In Progress');
   });
+
+  it('enforces strict department-scoped RBAC so Water & Sewage staff can only view and update Water & Sewage tasks', async () => {
+    const storage = createInMemoryStorage();
+    const localRepo = new LocalIssueRepository({ storage });
+
+    const waterStaffSession: CivicSession = {
+      ...createVerifiedAdminSession(),
+      uid: 'water-officer-1',
+      displayName: 'Water Dept Officer',
+      assignedDepartment: 'Water & Sewage',
+    };
+
+    // Unfiltered listIssues is automatically locked to Water & Sewage only
+    const listedForWater = await localRepo.listIssues({}, waterStaffSession);
+    expect(listedForWater.length).toBeGreaterThanOrEqual(1);
+    expect(
+      listedForWater.every((item) => item.assignedDepartment === 'Water & Sewage'),
+    ).toBe(true);
+
+    // Explicit query against another department throws FORBIDDEN
+    await expect(
+      localRepo.listIssues(
+        { department: 'Roads & Infrastructure' },
+        waterStaffSession,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    // Single-doc get against another department throws FORBIDDEN
+    await expect(
+      localRepo.getIssueById('seed-issue-001', waterStaffSession),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    // Updating another department's task throws FORBIDDEN
+    await expect(
+      localRepo.updateIssue(
+        'seed-issue-001',
+        { status: 'In Progress' },
+        waterStaffSession,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    // Reassigning a Water & Sewage issue out to another department throws FORBIDDEN
+    await expect(
+      localRepo.updateIssue(
+        'seed-issue-002',
+        { assignedDepartment: 'Roads & Infrastructure' },
+        waterStaffSession,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    // Updating an assigned Water & Sewage task succeeds
+    const updatedWater = await localRepo.updateIssue(
+      'seed-issue-002',
+      { status: 'In Progress', resolutionNotes: 'Water main shutoff crew dispatched' },
+      waterStaffSession,
+    );
+    expect(updatedWater.status).toBe('In Progress');
+    expect(updatedWater.assignedDepartment).toBe('Water & Sewage');
+
+    // FirestoreIssueRepository automatically enforces department where clause on listIssues
+    const harness = createMockFirestoreHarness({
+      issues: {
+        'fs-water-1': {
+          ...(createSeedIssues()[1] as CivicIssue),
+          id: 'fs-water-1',
+          assignedDepartment: 'Water & Sewage',
+        },
+      },
+      admins: {
+        'water-officer-1': { active: true, department: 'Water & Sewage' },
+      },
+    });
+    const firestoreRepo = new FirestoreIssueRepository(harness.fakeDb, harness.ops);
+    const fsWaterList = await firestoreRepo.listIssues({}, waterStaffSession);
+    expect(fsWaterList.length).toBe(1);
+    expect(harness.recordedWheres).toContainEqual({
+      fieldPath: 'assignedDepartment',
+      value: 'Water & Sewage',
+    });
+
+    // Hybrid sandbox also blocks cross-department update by scoped Preview Admin
+    const scopedHybrid = new HybridIssueRepository({
+      firestoreRepo,
+      localRepo,
+      isFirebaseConfigured: () => true,
+      isOnline: () => true,
+    });
+    const waterPreviewSession: CivicSession = {
+      ...createPreviewAdminSession(),
+      assignedDepartment: 'Water & Sewage',
+    };
+    await expect(
+      scopedHybrid.updateIssue(
+        'seed-issue-001',
+        { status: 'In Progress' },
+        waterPreviewSession,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
 });

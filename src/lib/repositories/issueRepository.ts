@@ -57,8 +57,11 @@ export class RepositoryError extends Error {
 
 export interface IssueRepository {
   getStorageMode(): StorageMode;
-  listIssues(options?: IssueFilterOptions): Promise<CivicIssue[]>;
-  getIssueById(id: string): Promise<CivicIssue | null>;
+  listIssues(
+    options?: IssueFilterOptions,
+    session?: CivicSession,
+  ): Promise<CivicIssue[]>;
+  getIssueById(id: string, session?: CivicSession): Promise<CivicIssue | null>;
   createIssue(input: IssueCreateInput, session: CivicSession): Promise<CivicIssue>;
   upvoteIssue(issueId: string, session: CivicSession): Promise<CivicIssue>;
   updateIssue(
@@ -184,6 +187,82 @@ export function assertValidStatusTransition(
     'INVALID_STATUS_TRANSITION',
     `Cannot transition issue status from "${current}" to "${next}"`,
   );
+}
+
+export function getScopedAdminDepartment(
+  session?: CivicSession | null,
+): Department | null {
+  if (!session || session.role !== 'admin') {
+    return null;
+  }
+  if (!session.assignedDepartment) {
+    return null;
+  }
+  const parsed = DepartmentSchema.safeParse(session.assignedDepartment);
+  if (!parsed.success) {
+    throw new RepositoryError(
+      'FORBIDDEN',
+      'Invalid assignedDepartment scope on admin session.',
+    );
+  }
+  return parsed.data;
+}
+
+export function applyDepartmentReadScope(
+  options: IssueFilterOptions | undefined,
+  session?: CivicSession | null,
+): { limitCount: number; status?: IssueStatus; department?: Department } {
+  const validated = validateFilterOptions(options);
+  const scopedDept = getScopedAdminDepartment(session);
+  if (!scopedDept) {
+    return validated;
+  }
+  if (validated.department && validated.department !== scopedDept) {
+    throw new RepositoryError(
+      'FORBIDDEN',
+      `Department staff (${scopedDept}) cannot query ${validated.department} tasks.`,
+    );
+  }
+  return {
+    ...validated,
+    department: scopedDept,
+  };
+}
+
+export function assertDepartmentReadAccess(
+  issueDepartment: Department,
+  session?: CivicSession | null,
+): void {
+  const scopedDept = getScopedAdminDepartment(session);
+  if (scopedDept && issueDepartment !== scopedDept) {
+    throw new RepositoryError(
+      'FORBIDDEN',
+      `Access denied: ${issueDepartment} issues are outside ${scopedDept} scope.`,
+    );
+  }
+}
+
+export function assertDepartmentWriteScope(
+  existingDepartment: Department,
+  nextDepartment: Department | undefined,
+  session: CivicSession,
+): void {
+  const scopedDept = getScopedAdminDepartment(session);
+  if (!scopedDept) {
+    return;
+  }
+  if (existingDepartment !== scopedDept) {
+    throw new RepositoryError(
+      'FORBIDDEN',
+      `Department staff (${scopedDept}) cannot update ${existingDepartment} tasks.`,
+    );
+  }
+  if (nextDepartment !== undefined && nextDepartment !== scopedDept) {
+    throw new RepositoryError(
+      'FORBIDDEN',
+      `Department staff (${scopedDept}) cannot reassign tasks to ${nextDepartment}.`,
+    );
+  }
 }
 
 export function sanitizeReporterDisplayName(

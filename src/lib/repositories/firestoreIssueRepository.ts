@@ -20,18 +20,22 @@ import {
 import type {
   CivicIssue,
   CivicSession,
+  Department,
   IssueAdminUpdateInput,
   IssueCreateInput,
   IssueFilterOptions,
   StorageMode,
 } from '../../../shared/types/civic.js';
 import { CivicIssueSchema } from '../../../shared/schemas/issue.js';
+import { DepartmentSchema } from '../../../shared/schemas/triage.js';
 import {
   RepositoryError,
+  applyDepartmentReadScope,
+  assertDepartmentReadAccess,
+  assertDepartmentWriteScope,
   assertValidStatusTransition,
   cloneCivicIssue,
   sanitizeReporterDisplayName,
-  validateFilterOptions,
   validateIssueCreateInput,
   validateIssueUpdateInput,
   type IssueRepository,
@@ -189,25 +193,48 @@ export function snapshotToCivicIssue(
   return cloneCivicIssue(parsed.data);
 }
 
-export async function isVerifiedAdminUid(
+export interface VerifiedAdminProfile {
+  readonly isAdmin: boolean;
+  readonly department: Department | null;
+}
+
+export async function getVerifiedAdminProfile(
   uid: string,
   db: Firestore,
   ops: FirestoreOperations = defaultFirestoreOperations,
-): Promise<boolean> {
+): Promise<VerifiedAdminProfile> {
   if (uid.trim().length === 0) {
-    return false;
+    return { isAdmin: false, department: null };
   }
   try {
     const adminRef = ops.doc(db, 'admins', uid);
     const snap = await ops.getDoc(adminRef);
     if (!snap.exists()) {
-      return false;
+      return { isAdmin: false, department: null };
     }
     const data = snap.data();
-    return data !== undefined && data.active === true;
+    if (data === undefined || data.active !== true) {
+      return { isAdmin: false, department: null };
+    }
+    if (typeof data.department === 'string') {
+      const parsedDept = DepartmentSchema.safeParse(data.department);
+      if (parsedDept.success) {
+        return { isAdmin: true, department: parsedDept.data };
+      }
+    }
+    return { isAdmin: true, department: null };
   } catch {
-    return false;
+    return { isAdmin: false, department: null };
   }
+}
+
+export async function isVerifiedAdminUid(
+  uid: string,
+  db: Firestore,
+  ops: FirestoreOperations = defaultFirestoreOperations,
+): Promise<boolean> {
+  const profile = await getVerifiedAdminProfile(uid, db, ops);
+  return profile.isAdmin;
 }
 
 export class FirestoreIssueRepository implements IssueRepository {
@@ -229,8 +256,11 @@ export class FirestoreIssueRepository implements IssueRepository {
     return 'firestore';
   }
 
-  public async listIssues(options?: IssueFilterOptions): Promise<CivicIssue[]> {
-    const filter = validateFilterOptions(options);
+  public async listIssues(
+    options?: IssueFilterOptions,
+    session?: CivicSession,
+  ): Promise<CivicIssue[]> {
+    const filter = applyDepartmentReadScope(options, session);
     const constraints: QueryConstraint[] = [];
 
     if (filter.department !== undefined) {
@@ -263,7 +293,10 @@ export class FirestoreIssueRepository implements IssueRepository {
     return results;
   }
 
-  public async getIssueById(id: string): Promise<CivicIssue | null> {
+  public async getIssueById(
+    id: string,
+    session?: CivicSession,
+  ): Promise<CivicIssue | null> {
     if (id.trim().length === 0) {
       return null;
     }
@@ -272,11 +305,15 @@ export class FirestoreIssueRepository implements IssueRepository {
     if (!snap.exists()) {
       return null;
     }
-    return snapshotToCivicIssue(
+    const parsed = snapshotToCivicIssue(
       snap.id,
       snap.data({ serverTimestamps: 'estimate' }),
       this.now().toISOString(),
     );
+    if (parsed !== null) {
+      assertDepartmentReadAccess(parsed.assignedDepartment, session);
+    }
+    return parsed;
   }
 
   public async createIssue(
@@ -438,6 +475,12 @@ export class FirestoreIssueRepository implements IssueRepository {
           `Stored issue "${issueId}" failed schema validation`,
         );
       }
+
+      assertDepartmentWriteScope(
+        current.assignedDepartment,
+        validatedPatch.assignedDepartment,
+        session,
+      );
 
       const nextStatus = validatedPatch.status ?? current.status;
       if (validatedPatch.status !== undefined) {

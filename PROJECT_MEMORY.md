@@ -1,7 +1,7 @@
 # PROJECT_MEMORY — CivicResolve
 
 ## Status
-- **Current Phase:** Phase 3 Complete — Full Backend + 60/30/10 Scroll-Reactive Lavender Frontend + Dual-Portal Workspace Isolation + 17-Point Security Lockdown & Audit verified (**211/211 automated tests passing**: 93 unit/UI/security + 118 E2E, 0 TypeScript errors, 0 ESLint warnings, 0 `npm audit` vulnerabilities, live `firestore.rules` deployed to `civic-sense-43d74`).
+- **Current Phase:** Phase 4 Complete — Bionis-Inspired Responsive Shell + Scroll-Driven Lavender/Sandy Atmosphere + Strict Department-Scoped Admin RBAC (`AuthService`, `IssueRepository`, `HybridIssueRepository`, `LocalIssueRepository`, `FirestoreIssueRepository`, and live `firestore.rules` deployed to `civic-sense-43d74`) verified (**215/215 automated tests passing**: 97 unit/UI/security + 118 E2E, 0 TypeScript errors, 0 ESLint warnings, 0 `npm audit` vulnerabilities, `vite build` 452ms).
 
 ## Workspace File Inventory (Excluding `node_modules` / `dist`)
 - **Config & Rules:**
@@ -17,10 +17,10 @@
   - `server/devServer.ts`
 - **Frontend UI & Client Services (`src/`):**
   - `src/main.tsx`, `src/App.tsx`, `src/styles/index.css`
-  - `src/components/layout/TopNav.tsx`
+  - `src/components/layout/TopNav.tsx`, `BionisSidebar.tsx`
   - `src/components/auth/PortalLoginView.tsx`
   - `src/components/report/ReportIssueView.tsx`
-  - `src/components/dashboard/TrackIssuesView.tsx`
+  - `src/components/dashboard/TrackIssuesView.tsx`, `BionisAnalyticsRow.tsx`
   - `src/components/admin/AdminDashboardView.tsx`
   - `src/components/map/CivicMap.tsx`
   - `src/components/spec/DimensionalSpecModal.tsx`
@@ -29,6 +29,6 @@
   - `src/lib/media/imageValidation.ts`, `src/lib/media/imageCompressor.ts`
   - `src/lib/voice/useSpeechToText.ts`
   - `src/lib/repositories/issueRepository.ts`, `firestoreIssueRepository.ts`, `localIssueRepository.ts`, `hybridIssueRepository.ts`, `seedIssues.ts`
-- **Automated Tests (`tests/` — 211 tests total):**
-  - Unit, Integration, UI & 17-Point Security Audit (`93 tests`): `tests/shared/schemas.test.ts`, `tests/api/triageHandler.test.ts`, `tests/api/middleware.test.ts`, `tests/api/securityPosture.test.ts`, `tests/api/full17PointSecurityAudit.test.ts`, `tests/api/devServer.test.ts`, `tests/lib/authService.test.ts`, `tests/lib/firestoreRules.test.ts`, `tests/lib/imageValidation.test.ts`, `tests/lib/issueRepository.test.ts`, `tests/ui/app.ui.test.tsx`
+- **Automated Tests (`tests/` — 215 tests total):**
+  - Unit, Integration, UI & 17-Point Security Audit (`97 tests`): `tests/shared/schemas.test.ts`, `tests/api/triageHandler.test.ts`, `tests/api/middleware.test.ts`, `tests/api/securityPosture.test.ts`, `tests/api/full17PointSecurityAudit.test.ts`, `tests/api/devServer.test.ts`, `tests/lib/authService.test.ts`, `tests/lib/firestoreRules.test.ts`, `tests/lib/imageValidation.test.ts`, `tests/lib/issueRepository.test.ts`, `tests/ui/app.ui.test.tsx`
   - E2E (`118 tests`): `tests/e2e/f1-f2-contracts.e2e.test.ts`, `f3-http-endpoints.e2e.test.ts`, `f4-f6-ai-triage.e2e.test.ts`, `f7-security-posture.e2e.test.ts`, `f8-f10-data-auth.e2e.test.ts`, `t3-t4-scenarios.e2e.test.ts`

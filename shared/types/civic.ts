@@ -201,6 +201,7 @@ export interface CivicSession {
   displayName: string;
   email: string | null;
   role: UserRole;
+  assignedDepartment?: Department | null;
   provider: AuthProviderKind;
   isAnonymous: boolean;
   isPreviewAdmin: boolean;

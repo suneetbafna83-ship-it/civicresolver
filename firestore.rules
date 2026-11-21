@@ -50,6 +50,7 @@ service cloud.firestore {
     //
     // Collection: admins/{uid} (Console / Admin-SDK provisioned only)
     //   - active: bool
+    //   - department: string | null (optional; scopes admin RBAC to a single Department when non-null)
     //
     // ===============================================================
 
@@ -91,6 +92,45 @@ service cloud.firestore {
         'Water & Sewage',
         'Public Safety'
       ];
+    }
+
+    function getAdminDocDepartment(adminPath) {
+      return exists(adminPath) &&
+        'active' in get(adminPath).data &&
+        get(adminPath).data.active == true &&
+        'department' in get(adminPath).data &&
+        get(adminPath).data.department != null
+        ? get(adminPath).data.department
+        : null;
+    }
+
+    function getAdminDepartment() {
+      return !isAuthenticated()
+        ? null
+        : ('department' in request.auth.token && request.auth.token.department != null)
+          ? request.auth.token.department
+          : getAdminDocDepartment(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isAuthorizedAdminDepartment(existingDept, nextDept) {
+      let adminDept = getAdminDepartment();
+      return adminDept == null || (
+        isValidDepartment(adminDept) &&
+        existingDept == adminDept &&
+        nextDept == adminDept
+      );
+    }
+
+    function isScopedAdminListMatch() {
+      let adminDept = getAdminDepartment();
+      return adminDept == null || (
+        isValidDepartment(adminDept) &&
+        resource.data.assignedDepartment == adminDept
+      );
+    }
+
+    function isAuthorizedAdminListScope() {
+      return !isVerifiedAdmin() || isScopedAdminListMatch();
     }
 
     function isValidPriorityLevel(priority) {
@@ -272,7 +312,11 @@ service cloud.firestore {
           'resolvedAt'
         ]) &&
         request.resource.data.updatedAt == request.time &&
-        isValidAdminStatusAndResolution(resource.data, request.resource.data);
+        isValidAdminStatusAndResolution(resource.data, request.resource.data) &&
+        isAuthorizedAdminDepartment(
+          resource.data.assignedDepartment,
+          request.resource.data.assignedDepartment
+        );
     }
 
     function isValidVoteCreate(data, voteId) {
@@ -294,7 +338,8 @@ service cloud.firestore {
       allow list: if isAuthenticated() &&
         request.query.limit != null &&
         request.query.limit >= 1 &&
-        request.query.limit <= 50;
+        request.query.limit <= 50 &&
+        isAuthorizedAdminListScope();
 
       allow create: if isAuthenticated() &&
         isValidIssueCreate(request.resource.data, issueId);

@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import {
+  Building2,
+  Droplets,
   Lock,
   ShieldCheck,
   User,
   UserCheck,
 } from 'lucide-react';
 import {
-  hashPasswordPbkdf2,
-  verifyPasswordPbkdf2,
-} from '../../lib/auth/passwordHasher.js';
+  DEPARTMENTS,
+  type Department,
+} from '../../../shared/types/civic.js';
 
 export interface PortalLoginViewProps {
   readonly onCitizenGuestSignIn: () => Promise<void>;
@@ -23,10 +25,13 @@ export interface PortalLoginViewProps {
     displayName: string,
   ) => Promise<void>;
   readonly onAdminSignIn: (
-    officerId: string,
+    officerEmail: string,
     passcode: string,
+    department: Department | null,
   ) => Promise<void>;
-  readonly onAdminQuickDemoSignIn: () => Promise<void>;
+  readonly onAdminQuickDemoSignIn: (
+    department?: Department | null,
+  ) => Promise<void>;
 }
 
 export function PortalLoginView({
@@ -46,6 +51,9 @@ export function PortalLoginView({
   const [citizenBusy, setCitizenBusy] = useState(false);
 
   // Admin Login Form State
+  const [adminDepartment, setAdminDepartment] = useState<Department | 'ALL'>(
+    'Water & Sewage',
+  );
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPasscode, setAdminPasscode] = useState('');
   const [adminError, setAdminError] = useState<string | null>(null);
@@ -79,19 +87,15 @@ export function PortalLoginView({
   const handleAdminSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     setAdminError(null);
-    if (adminEmail.trim().length < 3 || adminPasscode.trim().length < 4) {
-      setAdminError('Enter valid municipal officer ID/email and passcode.');
+    if (adminEmail.trim().length < 3 || adminPasscode.length < 4) {
+      setAdminError('Enter valid verified municipal officer email and passcode.');
       return;
     }
     setAdminBusy(true);
     try {
-      const digest = await hashPasswordPbkdf2(adminPasscode);
-      const verified = await verifyPasswordPbkdf2(adminPasscode, digest);
-      if (!verified) {
-        setAdminError('Cryptographic passcode verification failed.');
-        return;
-      }
-      await onAdminSignIn(adminEmail.trim(), digest);
+      const requestedScope =
+        adminDepartment === 'ALL' ? null : adminDepartment;
+      await onAdminSignIn(adminEmail.trim(), adminPasscode, requestedScope);
     } catch (err) {
       setAdminError(
         err instanceof Error
@@ -151,7 +155,7 @@ export function PortalLoginView({
                   </p>
                 </div>
               </div>
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-[#11131a] dark:bg-slate-800 dark:text-white">
+              <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-[#11131a] dark:bg-slate-800 dark:text-white">
                 Citizen Role
               </span>
             </div>
@@ -328,32 +332,72 @@ export function PortalLoginView({
                   </p>
                 </div>
               </div>
-              <span className="rounded-full bg-[#11131a] px-2.5 py-0.5 text-[11px] font-bold text-white dark:bg-white dark:text-[#11131a]">
+              <span className="shrink-0 whitespace-nowrap rounded-full bg-[#11131a] px-2.5 py-0.5 text-[11px] font-bold text-white dark:bg-white dark:text-[#11131a]">
                 Admin Role
               </span>
             </div>
 
-            {/* Instant Admin Demo Entry */}
-            <div className="surface-well p-2.5">
+            {/* Instant Admin Demo Entry (Scoped Water Dept + Full City Ops) */}
+            <div className="surface-well grid grid-cols-1 gap-2 p-2.5 sm:grid-cols-2">
               <button
                 type="button"
                 disabled={adminBusy}
-                onClick={() => void onAdminQuickDemoSignIn()}
-                className="press-feedback flex w-full items-center justify-center gap-2 rounded-full bg-[#11131a] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 dark:bg-white dark:text-[#11131a]"
+                onClick={() => void onAdminQuickDemoSignIn('Water & Sewage')}
+                className="press-feedback inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-full bg-[#3730a3] px-3 py-2 text-xs font-semibold text-white hover:bg-[#312e81]"
               >
-                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                <Droplets className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>Water Dept Staff Only (Demo)</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={adminBusy}
+                onClick={() => void onAdminQuickDemoSignIn(null)}
+                className="press-feedback inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-full bg-[#581c87] px-3 py-2 text-xs font-semibold text-white hover:bg-[#4c1d95]"
+              >
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>Enter Admin Command Desk (1-Click Demo Admin)</span>
               </button>
             </div>
 
-            {/* Officer Credentials Form */}
+            {/* Verified Firebase Officer Credentials Form with Department Clearance */}
             <form
               onSubmit={(e) => void handleAdminSubmit(e)}
-              className="flex flex-col gap-2.5"
+              className="flex flex-col gap-2"
             >
-              <span className="text-xs font-bold text-[#11131a] dark:text-white">
-                Municipal Officer Credentials
-              </span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold text-[#11131a] dark:text-white">
+                  Verified Municipal Officer Sign In
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#581c87] dark:text-purple-300">
+                  <Building2 className="h-3 w-3" aria-hidden="true" />
+                  Role &amp; Dept Checked
+                </span>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="admin-department-select"
+                  className="block text-[11px] font-semibold text-[#11131a] dark:text-white"
+                >
+                  Department Clearance Scope
+                </label>
+                <select
+                  id="admin-department-select"
+                  value={adminDepartment}
+                  onChange={(e) =>
+                    setAdminDepartment(e.target.value as Department | 'ALL')
+                  }
+                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-[#11131a] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                >
+                  {DEPARTMENTS.map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept} (Scoped Staff Only)
+                    </option>
+                  ))}
+                  <option value="ALL">All Departments (City Ops Super Admin)</option>
+                </select>
+              </div>
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div>
@@ -361,15 +405,15 @@ export function PortalLoginView({
                     htmlFor="admin-email-input"
                     className="block text-[11px] font-semibold text-[#11131a] dark:text-white"
                   >
-                    Officer Email / Badge ID
+                    Verified Officer Email
                   </label>
                   <input
                     id="admin-email-input"
-                    type="text"
+                    type="email"
                     required
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
-                    placeholder="officer@municipal.gov"
+                    placeholder="water.staff@municipal.gov"
                     className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-[#11131a] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                   />
                 </div>
@@ -379,7 +423,7 @@ export function PortalLoginView({
                     htmlFor="admin-passcode-input"
                     className="block text-[11px] font-semibold text-[#11131a] dark:text-white"
                   >
-                    Admin Passcode
+                    Officer Password
                   </label>
                   <input
                     id="admin-passcode-input"
@@ -388,7 +432,7 @@ export function PortalLoginView({
                     minLength={4}
                     value={adminPasscode}
                     onChange={(e) => setAdminPasscode(e.target.value)}
-                    placeholder="Officer password"
+                    placeholder="Firebase Auth password"
                     className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-[#11131a] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                   />
                 </div>
@@ -406,18 +450,18 @@ export function PortalLoginView({
               <button
                 type="submit"
                 disabled={adminBusy}
-                className="press-feedback rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-[#11131a] hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                className="press-feedback min-h-[38px] rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-[#11131a] hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
               >
                 {adminBusy
-                  ? 'Verifying Officer...'
-                  : 'Sign In to Admin Command Desk'}
+                  ? 'Verifying Clearance & Department...'
+                  : `Sign In (${adminDepartment === 'ALL' ? 'All Depts' : adminDepartment})`}
               </button>
             </form>
           </div>
 
           <p className="border-t border-slate-200/80 pt-2 text-[11px] font-medium text-slate-600 dark:border-slate-800 dark:text-slate-300">
             <Lock className="mr-1 inline h-3 w-3" aria-hidden="true" />
-            Admin accounts cannot use the Citizen reporting workspace.
+            Department staff cannot view, query, or update other departments&apos; tasks.
           </p>
         </article>
       </div>

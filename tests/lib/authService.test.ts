@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AuthProvider } from 'firebase/auth';
 import {
   LOCAL_GUEST_STORAGE_KEY,
+  PREVIEW_ADMIN_DEPT_STORAGE_KEY,
   PREVIEW_ADMIN_STORAGE_KEY,
   createAuthService,
   createInMemoryAuthStorage,
@@ -239,9 +240,79 @@ describe('AuthService', () => {
     // Sign out clears preview flag and emits null
     await service.signOut();
     expect(storage.getItem(PREVIEW_ADMIN_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(PREVIEW_ADMIN_DEPT_STORAGE_KEY)).toBeNull();
     expect(await service.getCurrentSession()).toBeNull();
     expect(received.at(-1)).toBeNull();
 
     unsubscribe();
+  });
+
+  it('scopes enterPreviewAdminMode and signInDepartmentOfficer to verified departments and blocks cross-department escalation', async () => {
+    const storage = createInMemoryAuthStorage();
+    const { mockAuth, fns } = createMockFirebaseAuthFns();
+
+    const waterService = createAuthService({
+      isFirebaseConfigured: () => true,
+      getAuthInstance: () => mockAuth,
+      checkVerifiedAdmin: async (uid) => uid === 'email-uid-1',
+      resolveAdminDepartment: async (uid) =>
+        uid === 'email-uid-1' ? 'Water & Sewage' : null,
+      sessionStorage: storage,
+      firebaseAuthFns: fns,
+    });
+
+    // Scoped preview admin persists Water & Sewage across reload
+    const scopedPreview = await waterService.enterPreviewAdminMode('Water & Sewage');
+    expect(scopedPreview.role).toBe('admin');
+    expect(scopedPreview.assignedDepartment).toBe('Water & Sewage');
+    expect(storage.getItem(PREVIEW_ADMIN_DEPT_STORAGE_KEY)).toBe('Water & Sewage');
+    const restoredPreview = await waterService.getCurrentSession();
+    expect(restoredPreview?.assignedDepartment).toBe('Water & Sewage');
+
+    await waterService.signOut();
+
+    // Verified Firebase Water & Sewage officer succeeds when selecting Water & Sewage
+    const verifiedWater = await waterService.signInDepartmentOfficer(
+      'water.officer@civic.gov',
+      'ValidPass123!',
+      'Water & Sewage',
+    );
+    expect(verifiedWater.role).toBe('admin');
+    expect(verifiedWater.isVerifiedFirebaseAdmin).toBe(true);
+    expect(verifiedWater.assignedDepartment).toBe('Water & Sewage');
+
+    // Cross-department access or escalation to City Ops rejects with FORBIDDEN and signs out
+    await expect(
+      waterService.signInDepartmentOfficer(
+        'water.officer@civic.gov',
+        'ValidPass123!',
+        'Roads & Infrastructure',
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    await expect(
+      waterService.signInDepartmentOfficer(
+        'water.officer@civic.gov',
+        'ValidPass123!',
+        null,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(fns.signOut).toHaveBeenCalledTimes(2);
+
+    // Non-admin citizen account attempting officer login is rejected with FORBIDDEN
+    const citizenDeniedService = createAuthService({
+      isFirebaseConfigured: () => true,
+      getAuthInstance: () => mockAuth,
+      checkVerifiedAdmin: async () => false,
+      sessionStorage: createInMemoryAuthStorage(),
+      firebaseAuthFns: fns,
+    });
+    await expect(
+      citizenDeniedService.signInDepartmentOfficer(
+        'citizen@example.com',
+        'ValidPass123!',
+        'Water & Sewage',
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });

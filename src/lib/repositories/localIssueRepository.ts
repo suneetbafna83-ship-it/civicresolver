@@ -10,10 +10,12 @@ import type {
 import { CivicIssueSchema } from '../../../shared/schemas/issue.js';
 import {
   RepositoryError,
+  applyDepartmentReadScope,
+  assertDepartmentReadAccess,
+  assertDepartmentWriteScope,
   assertValidStatusTransition,
   cloneCivicIssue,
   sanitizeReporterDisplayName,
-  validateFilterOptions,
   validateIssueCreateInput,
   validateIssueUpdateInput,
   type IssueRepository,
@@ -92,8 +94,11 @@ export class LocalIssueRepository implements IssueRepository {
     return 'local';
   }
 
-  public async listIssues(options?: IssueFilterOptions): Promise<CivicIssue[]> {
-    const filter = validateFilterOptions(options);
+  public async listIssues(
+    options?: IssueFilterOptions,
+    session?: CivicSession,
+  ): Promise<CivicIssue[]> {
+    const filter = applyDepartmentReadScope(options, session);
     const issues = this.loadIssues();
 
     const filtered = issues.filter((issue) => {
@@ -110,12 +115,19 @@ export class LocalIssueRepository implements IssueRepository {
     return filtered.slice(0, filter.limitCount).map(cloneCivicIssue);
   }
 
-  public async getIssueById(id: string): Promise<CivicIssue | null> {
+  public async getIssueById(
+    id: string,
+    session?: CivicSession,
+  ): Promise<CivicIssue | null> {
     if (id.trim().length === 0) {
       return null;
     }
     const found = this.loadIssues().find((issue) => issue.id === id);
-    return found !== undefined ? cloneCivicIssue(found) : null;
+    if (found === undefined) {
+      return null;
+    }
+    assertDepartmentReadAccess(found.assignedDepartment, session);
+    return cloneCivicIssue(found);
   }
 
   public async createIssue(
@@ -224,6 +236,12 @@ export class LocalIssueRepository implements IssueRepository {
     if (existing === undefined) {
       throw new RepositoryError('NOT_FOUND', `Issue "${issueId}" was not found`);
     }
+
+    assertDepartmentWriteScope(
+      existing.assignedDepartment,
+      validatedPatch.assignedDepartment,
+      session,
+    );
 
     const nextStatus = validatedPatch.status ?? existing.status;
     if (validatedPatch.status !== undefined) {
