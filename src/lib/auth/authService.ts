@@ -30,6 +30,10 @@ import {
   getVerifiedAdminProfile,
   isVerifiedAdminUid,
 } from '../repositories/firestoreIssueRepository.js';
+import {
+  findRosterOfficerByEmail,
+  verifyRosterOfficerPasskey,
+} from './departmentRoster.js';
 
 export const PREVIEW_ADMIN_STORAGE_KEY = 'civicresolve.previewAdmin.v1';
 export const PREVIEW_ADMIN_DEPT_STORAGE_KEY = 'civicresolve.previewAdminDept.v1';
@@ -657,6 +661,65 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
         throw new AuthServiceError('INVALID_INPUT', 'Officer passcode is required');
       }
 
+      // 1. Check PBKDF2-HMAC-SHA256 verified municipal department officer roster
+      const rosterOfficer = findRosterOfficerByEmail(emailParsed.data);
+      if (rosterOfficer !== null) {
+        const validPasskey = await verifyRosterOfficerPasskey(
+          rosterOfficer,
+          password,
+        );
+        if (!validPasskey) {
+          throw new AuthServiceError(
+            'INVALID_CREDENTIALS',
+            'Invalid department passkey. Verify your department officer credentials.',
+          );
+        }
+
+        const assignedDept = rosterOfficer.department;
+        if (expectedDepartment === null && assignedDept !== null) {
+          throw new AuthServiceError(
+            'FORBIDDEN',
+            `Access denied: ${rosterOfficer.displayName} is restricted to ${assignedDept} and cannot open City-Wide Admin.`,
+          );
+        }
+        if (
+          expectedDepartment !== undefined &&
+          expectedDepartment !== null &&
+          assignedDept !== null &&
+          assignedDept !== expectedDepartment
+        ) {
+          throw new AuthServiceError(
+            'FORBIDDEN',
+            `Access denied: officer is authorized only for ${assignedDept}, not ${expectedDepartment}.`,
+          );
+        }
+
+        const effectiveDepartment =
+          assignedDept !== null ? assignedDept : (expectedDepartment ?? null);
+        try {
+          storage.removeItem(LOCAL_GUEST_STORAGE_KEY);
+          storage.setItem(PREVIEW_ADMIN_STORAGE_KEY, 'true');
+          if (effectiveDepartment !== null) {
+            storage.setItem(PREVIEW_ADMIN_DEPT_STORAGE_KEY, effectiveDepartment);
+          } else {
+            storage.removeItem(PREVIEW_ADMIN_DEPT_STORAGE_KEY);
+          }
+        } catch {
+          // Ignore storage errors
+        }
+
+        const officerSession: CivicSession = {
+          ...buildPreviewAdminSession(
+            effectiveDepartment,
+            `${rosterOfficer.displayName} (${rosterOfficer.wardZone})`,
+          ),
+          email: rosterOfficer.email,
+        };
+        notifyListeners(officerSession);
+        return officerSession;
+      }
+
+      // 2. Fallback to Firebase Auth + Firestore admins/{uid} verified clearance
       const client = requireConfiguredAuth();
       let cred: { readonly user: AuthUserLike };
       try {

@@ -13,12 +13,18 @@ import {
   type Department,
   type PriorityLevel,
 } from '../../../shared/types/civic.js';
+import {
+  getUiStrings,
+  translatePriority,
+  type AppLanguage,
+} from '../../lib/i18n/translations.js';
 import { computeSlaStatus } from '../../lib/utils/slaUtils.js';
 
 export interface BionisAnalyticsRowProps {
   readonly issues: ReadonlyArray<CivicIssue>;
   readonly scopeLabel: string;
   readonly accent: 'teal' | 'plum';
+  readonly language?: AppLanguage;
   readonly scopedDepartment?: Department | null;
   readonly actionSlot?: React.ReactNode;
 }
@@ -53,9 +59,12 @@ export function BionisAnalyticsRow({
   issues,
   scopeLabel,
   accent,
+  language = 'en',
   scopedDepartment = null,
   actionSlot,
 }: BionisAnalyticsRowProps): React.ReactElement {
+  const t = getUiStrings(language);
+
   const metrics = useMemo(() => {
     const total = issues.length;
     let resolved = 0;
@@ -101,8 +110,7 @@ export function BionisAnalyticsRow({
 
     const open = total - resolved;
     const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : 100;
-    const avgUrgency =
-      total > 0 ? (urgencySum / total).toFixed(1) : '0.0';
+    const avgUrgency = total > 0 ? (urgencySum / total).toFixed(1) : '0.0';
     const onTimeOpen = Math.max(0, open - overdue);
     const slaHealthScore =
       total === 0
@@ -120,7 +128,6 @@ export function BionisAnalyticsRow({
             ),
           );
 
-    // 7-day trend buckets ending at latest issue timestamp (deterministic for SSR/tests)
     const maxCreatedMs = issues.reduce((max, item) => {
       const parsed = Date.parse(item.createdAt);
       return Number.isFinite(parsed) && parsed > max ? parsed : max;
@@ -149,7 +156,6 @@ export function BionisAnalyticsRow({
       trendPoints.push({ label, reported: rep, resolved: res });
     }
 
-    // Department share inside current scope
     const deptCounts = (
       scopedDepartment ? [scopedDepartment] : DEPARTMENTS
     ).map((dept) => {
@@ -174,14 +180,11 @@ export function BionisAnalyticsRow({
     };
   }, [issues, scopedDepartment]);
 
-  // SVG Ring Gauge geometry (r=42 -> C=263.89)
   const ringRadius = 42;
   const ringCircumference = 2 * Math.PI * ringRadius;
   const ringDashOffset =
-    ringCircumference -
-    (metrics.slaHealthScore / 100) * ringCircumference;
+    ringCircumference - (metrics.slaHealthScore / 100) * ringCircumference;
 
-  // Dual-line SVG spline points
   const chartMaxVal = Math.max(
     2,
     ...metrics.trendPoints.map((p) => Math.max(p.reported, p.resolved)),
@@ -216,9 +219,8 @@ export function BionisAnalyticsRow({
 
   return (
     <div className="mb-6 flex flex-col gap-4">
-      {/* Row 1: Bionis Hero SLA Summary + Circular Ring Gauge + 4-Col KPI Strip */}
+      {/* Row 1: Hero SLA Summary + Circular Ring Gauge + 4-Col KPI Strip */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        {/* Hero SLA Ring Card (4 Cols on xl) */}
         <div className="surface-card flex items-center justify-between gap-4 p-4 sm:p-5 xl:col-span-5">
           <div className="flex min-w-0 flex-col gap-1.5">
             <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold text-[#3730a3] dark:bg-indigo-950/70 dark:text-indigo-200">
@@ -226,7 +228,7 @@ export function BionisAnalyticsRow({
               {scopeLabel}
             </span>
             <h2 className="text-base font-bold tracking-tight text-[#11131a] sm:text-lg dark:text-white">
-              SLA Health &amp; Readiness
+              {t.slaHealthTitle}
             </h2>
             <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
               {metrics.overdue > 0
@@ -274,11 +276,11 @@ export function BionisAnalyticsRow({
           </div>
         </div>
 
-        {/* 4-Card KPI Strip (7 Cols on xl, 2x2 on mobile/tablet, 4x1 on sm+) */}
+        {/* 4-Card KPI Strip */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:col-span-7">
           <div className="surface-card flex flex-col justify-between p-4">
             <span className="text-[11px] font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-              Total Scope
+              {t.totalScopeLabel}
             </span>
             <div className="mt-2 flex items-baseline justify-between gap-2">
               <span className="tabular-nums text-2xl font-extrabold text-[#11131a] dark:text-white">
@@ -292,7 +294,7 @@ export function BionisAnalyticsRow({
 
           <div className="surface-card flex flex-col justify-between p-4">
             <span className="text-[11px] font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-              Active Queue
+              {t.activeQueueLabel}
             </span>
             <div className="mt-2 flex items-baseline justify-between gap-2">
               <span className="tabular-nums text-2xl font-extrabold text-[#11131a] dark:text-white">
@@ -306,7 +308,7 @@ export function BionisAnalyticsRow({
 
           <div className="surface-card flex flex-col justify-between p-4">
             <span className="text-[11px] font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-              Overdue SLA
+              {t.overdueSlaLabel}
             </span>
             <div className="mt-2 flex items-baseline justify-between gap-2">
               <span className="tabular-nums text-2xl font-extrabold text-[#11131a] dark:text-white">
@@ -326,7 +328,7 @@ export function BionisAnalyticsRow({
 
           <div className="surface-card flex flex-col justify-between p-4">
             <span className="text-[11px] font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-              Resolved Rate
+              {t.resolvedRateLabel}
             </span>
             <div className="mt-2 flex items-baseline justify-between gap-2">
               <span className="tabular-nums text-2xl font-extrabold text-[#11131a] dark:text-white">
@@ -340,20 +342,20 @@ export function BionisAnalyticsRow({
         </div>
       </div>
 
-      {/* Row 2: Bionis 2-Col Analytics Charts (Priority Distribution Bar + Intake vs Resolution Line) */}
+      {/* Row 2: 2-Col Analytics Charts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="surface-card p-4 sm:p-5">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
               <h3 className="text-xs font-bold tracking-wide text-[#11131a] uppercase dark:text-white">
-                Severity &amp; Workload Breakdown
+                {t.severityBreakdownTitle}
               </h3>
               <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                Distribution across AI triage priority levels
+                AI triage priority distribution
               </p>
             </div>
             <span className="tabular-nums rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-[#11131a] dark:bg-slate-800 dark:text-slate-200">
-              Avg Urgency {metrics.avgUrgency}/10
+              Avg {metrics.avgUrgency}/10
             </span>
           </div>
 
@@ -364,8 +366,8 @@ export function BionisAnalyticsRow({
                 metrics.total > 0 ? Math.round((count / metrics.total) * 100) : 0;
               return (
                 <div key={level} className="flex items-center gap-3 text-xs">
-                  <span className="w-16 shrink-0 font-semibold text-slate-700 dark:text-slate-300">
-                    {level}
+                  <span className="w-20 shrink-0 truncate font-semibold text-slate-700 dark:text-slate-300">
+                    {translatePriority(level, language)}
                   </span>
                   <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
                     <div
@@ -389,20 +391,20 @@ export function BionisAnalyticsRow({
           <div className="mb-2 flex items-center justify-between gap-2">
             <div>
               <h3 className="text-xs font-bold tracking-wide text-[#11131a] uppercase dark:text-white">
-                6-Day Intake vs. Resolution Trend
+                {t.intakeTrendTitle}
               </h3>
               <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                Daily reported complaints (indigo) vs resolved repairs (teal)
+                Reported (indigo) vs Resolved (teal)
               </p>
             </div>
             <div className="flex items-center gap-3 text-[11px] font-bold">
               <span className="inline-flex items-center gap-1 text-[#3730a3] dark:text-indigo-300">
                 <span className="h-2 w-2 rounded-full bg-[#3730a3]" />
-                Reported
+                {t.stepReported.replace('1. ', '')}
               </span>
               <span className="inline-flex items-center gap-1 text-[#0f766e] dark:text-teal-300">
                 <span className="h-2 w-2 rounded-full bg-[#0f766e]" />
-                Resolved
+                {t.stepResolved.replace('3. ', '')}
               </span>
             </div>
           </div>
@@ -451,16 +453,16 @@ export function BionisAnalyticsRow({
         </div>
       </div>
 
-      {/* Row 3: Bionis 3-Col Tinted AI Insights / Vitals / Quick Dispatch Cards */}
+      {/* Row 3: 3-Col Tinted Insights */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-[20px] border border-indigo-200/80 bg-indigo-500/[0.08] p-4 dark:border-indigo-900/60 dark:bg-indigo-500/15">
           <div className="flex items-center gap-2 text-xs font-bold text-[#3730a3] dark:text-indigo-200">
             <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>AI Priority Spotlight</span>
+            <span>{t.aiSpotlightTitle}</span>
           </div>
           <p className="mt-1.5 text-xs font-semibold text-[#11131a] dark:text-white">
             {metrics.topPriorityIssue
-              ? `${metrics.topPriorityIssue.title} (Urgency ${metrics.topPriorityIssue.urgencyScore}/10)`
+              ? `${metrics.topPriorityIssue.title} (${metrics.topPriorityIssue.urgencyScore}/10)`
               : 'All tracked civic reports in scope are resolved.'}
           </p>
         </div>
@@ -468,7 +470,7 @@ export function BionisAnalyticsRow({
         <div className="rounded-[20px] border border-teal-200/80 bg-teal-500/[0.08] p-4 dark:border-teal-900/60 dark:bg-teal-500/15">
           <div className="flex items-center gap-2 text-xs font-bold text-[#0f766e] dark:text-teal-200">
             <TrendingUp className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>Civic Vitals &amp; Engagement</span>
+            <span>{t.civicVitalsTitle}</span>
           </div>
           <p className="tabular-nums mt-1.5 text-xs font-semibold text-[#11131a] dark:text-white">
             {metrics.totalUpvotes} citizen impact votes · {metrics.deptCounts.length} active department queue{metrics.deptCounts.length > 1 ? 's' : ''}
@@ -484,7 +486,7 @@ export function BionisAnalyticsRow({
             ) : (
               <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
             )}
-            <span>Next Operational Step</span>
+            <span>{t.nextStepTitle}</span>
           </div>
           <p className="mt-1.5 text-xs font-semibold text-[#11131a] dark:text-white">
             {metrics.overdue > 0

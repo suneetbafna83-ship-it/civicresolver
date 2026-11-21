@@ -479,7 +479,7 @@ export function ReportIssueView({
               htmlFor="issue-title-input"
               className="block text-xs font-bold text-[#11131a] dark:text-white"
             >
-              Short Title of the Problem <span className="text-red-600">*</span>
+              {t.issueTitleLabel} <span className="text-red-600">*</span>
             </label>
             <input
               id="issue-title-input"
@@ -500,7 +500,7 @@ export function ReportIssueView({
               htmlFor="issue-description-input"
               className="block text-xs font-bold text-[#11131a] dark:text-white"
             >
-              What Happened &amp; Public Impact <span className="text-red-600">*</span>
+              {t.issueDescLabel} <span className="text-red-600">*</span>
             </label>
             <textarea
               id="issue-description-input"
@@ -522,7 +522,7 @@ export function ReportIssueView({
                 htmlFor="issue-address-input"
                 className="block text-xs font-bold text-[#11131a] dark:text-white"
               >
-                Street / Landmark Location
+                {t.streetAddressLabel}
               </label>
               <input
                 id="issue-address-input"
@@ -541,7 +541,7 @@ export function ReportIssueView({
                 htmlFor="issue-category-select"
                 className="block text-xs font-bold text-[#11131a] dark:text-white"
               >
-                Issue Category
+                {t.categoryLabel}
               </label>
               <select
                 id="issue-category-select"
@@ -551,7 +551,7 @@ export function ReportIssueView({
                 }
                 className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-medium text-[#11131a] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
               >
-                <option value="AUTO">Auto-Detect with Gemini AI</option>
+                <option value="AUTO">{t.autoDetectAi}</option>
                 {ISSUE_CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
                     {cat}
@@ -570,7 +570,7 @@ export function ReportIssueView({
             </div>
           )}
 
-          {/* Action Buttons: Deep Indigo Submit Official Report */}
+          {/* Action Buttons: Black Submit Official Report */}
           <div className="flex flex-wrap items-center justify-end gap-2.5 border-t border-slate-200/80 pt-3 dark:border-slate-800">
             <button
               type="button"
@@ -586,16 +586,16 @@ export function ReportIssueView({
               className="press-feedback inline-flex min-h-[38px] items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-bold text-[#3730a3] hover:bg-indigo-100 disabled:opacity-50 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-200"
             >
               <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>{isAnalyzing ? 'Analyzing...' : t.analyzeAi}</span>
+              <span>{isAnalyzing ? t.analyzingLabel : t.analyzeAi}</span>
             </button>
 
             <button
               type="submit"
               disabled={isSubmitting || isAnalyzing}
-              className="press-feedback inline-flex min-h-[38px] items-center gap-1.5 rounded-full bg-[#3730a3] px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#312e81] disabled:opacity-50"
+              className="press-feedback inline-flex min-h-[38px] items-center gap-1.5 rounded-full bg-[#11131a] px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-[#11131a] dark:hover:bg-slate-200"
             >
               <Send className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>{isSubmitting ? 'Submitting...' : t.submitReport}</span>
+              <span>{isSubmitting ? t.submittingLabel : t.submitReport}</span>
             </button>
           </div>
         </form>
@@ -605,10 +605,10 @@ export function ReportIssueView({
           <div className="surface-card p-3.5 sm:p-4">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-bold text-[#11131a] dark:text-white">
-                Pin Problem Location
+                {t.pinLocationTitle}
               </h2>
               <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                GPS or click directly on map
+                {t.pinLocationHint}
               </span>
             </div>
             <CivicMap
@@ -629,7 +629,7 @@ export function ReportIssueView({
                   aria-hidden="true"
                 />
                 <h2 className="text-sm font-bold text-[#11131a] dark:text-white">
-                  Gemini AI Classification &amp; Routing
+                  {t.aiRoutingTitle}
                 </h2>
               </div>
               {triageResponse && (
@@ -643,7 +643,7 @@ export function ReportIssueView({
 
             {!triageResponse ? (
               <p className="py-3 text-center text-xs text-slate-600 dark:text-slate-300">
-                Click a sample preset above or press &ldquo;1. Analyze with Gemini AI&rdquo; to preview category, urgency, and department dispatch.
+                {t.aiPreviewHint}
               </p>
             ) : (
               <div className="mt-2.5 flex flex-col gap-2 text-xs">

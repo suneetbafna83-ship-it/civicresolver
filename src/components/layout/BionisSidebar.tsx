@@ -14,6 +14,7 @@ import type {
 } from '../../../shared/types/civic.js';
 import {
   getUiStrings,
+  translateDepartment,
   type AppLanguage,
 } from '../../lib/i18n/translations.js';
 import type { ActiveTab } from './TopNav.js';
@@ -55,7 +56,6 @@ export function BionisSidebar({
 
   return (
     <>
-      {/* Mobile Slide-Over Backdrop */}
       {isOpenMobile && (
         <div
           aria-hidden="true"
@@ -71,7 +71,7 @@ export function BionisSidebar({
         }`}
       >
         <div className="flex flex-col gap-5">
-          {/* Brand Header (Matches Bionis Sidebar Top Block) */}
+          {/* Brand Header */}
           <div className="flex items-center justify-between gap-2 px-1">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#3730a3] to-[#581c87] text-white shadow-sm">
@@ -82,7 +82,7 @@ export function BionisSidebar({
                   CivicResolve
                 </p>
                 <p className="text-[10px] font-bold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                  {isAdmin ? 'Municipal Command' : 'Citizen Portal'}
+                  {isAdmin ? t.allDeptAdminTag : t.citizenWorkspaceTag}
                 </p>
               </div>
             </div>
@@ -100,7 +100,7 @@ export function BionisSidebar({
           {/* Primary Role-Scoped Navigation */}
           <div>
             <p className="mb-2 px-2 text-[10px] font-bold tracking-widest text-slate-500 uppercase dark:text-slate-400">
-              {isAdmin ? 'Operations Queue' : 'Citizen Workspace'}
+              {isAdmin ? t.adminLead.replace(',', '') : t.citizenWorkspaceTag}
             </p>
             <nav
               aria-label="Primary sections"
@@ -174,30 +174,26 @@ export function BionisSidebar({
           <div className="rounded-2xl border border-slate-200/80 bg-slate-50/85 p-3 dark:border-slate-800 dark:bg-slate-900/75">
             <p className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#11131a] dark:text-white">
               <Lock className="h-3.5 w-3.5 text-[#581c87] dark:text-purple-300" aria-hidden="true" />
-              <span>RBAC Clearance Scope</span>
+              <span>{t.rbacScopeTitle}</span>
             </p>
             <p className="mt-1 text-xs font-semibold text-[#3730a3] dark:text-indigo-300">
               {isCitizen
-                ? 'Public Citizen Only'
+                ? t.citizenWorkspaceTag
                 : scopedDept !== null
-                  ? `${scopedDept} Only`
-                  : 'City Ops · All 5 Depts'}
+                  ? `${translateDepartment(scopedDept, language)} ${t.onlyTag}`
+                  : t.allDeptsSuperAdmin}
             </p>
             <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
-              {isCitizen
-                ? 'Admin Command Desk is strictly hidden & blocked.'
-                : scopedDept !== null
-                  ? `Isolated to ${scopedDept} tasks. Cross-department reads & edits denied.`
-                  : 'Full municipal triage & cross-department dispatch clearance.'}
+              {isCitizen ? t.citizenLockNote : t.adminLockNote}
             </p>
           </div>
         </div>
 
-        {/* Bottom Bionis-Inspired AI & Engine Telemetry Promo Card */}
+        {/* Bottom AI & Vault Telemetry Promo Card */}
         <div className="mt-4 rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/90 via-purple-50/75 to-amber-50/70 p-3.5 dark:border-indigo-900/60 dark:from-indigo-950/70 dark:via-purple-950/50 dark:to-slate-900">
           <div className="flex items-center gap-2 text-xs font-bold text-[#3730a3] dark:text-indigo-200">
             <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span>Civic AI &amp; Vault</span>
+            <span>{t.aiVaultTitle}</span>
           </div>
           <div className="mt-2 flex flex-col gap-1.5 text-[11px] font-medium text-slate-700 dark:text-slate-300">
             <div className="flex items-center justify-between gap-2">

@@ -21,6 +21,9 @@ import {
 import { downloadOfficialReceipt } from '../../lib/export/civicExport.js';
 import {
   getUiStrings,
+  translateDepartment,
+  translatePriority,
+  translateStatus,
   type AppLanguage,
 } from '../../lib/i18n/translations.js';
 import { computeSlaStatus } from '../../lib/utils/slaUtils.js';
@@ -114,15 +117,16 @@ export function TrackIssuesView({
           <span className="text-[#11131a] dark:text-white">{t.trackTitle}</span>
         </h1>
         <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-700 sm:text-sm dark:text-slate-300">
-          Follow every report with live SLA countdowns, before/after photo proof, and official downloadable receipts.
+          {t.trackSubtitle}
         </p>
       </div>
 
       {/* Bionis Hero SLA Gauge + 4 KPI Cards + 2 Analytics Charts + 3 Insights */}
       <BionisAnalyticsRow
         issues={issues}
-        scopeLabel="Citizen Transparency Pulse"
+        scopeLabel={t.citizenWorkspaceTag}
         accent="teal"
+        language={language}
       />
 
       {/* Refero-Inspired Filter Pills + Search */}
@@ -146,7 +150,11 @@ export function TrackIssuesView({
                 }`}
               >
                 <Filter className="h-3 w-3 opacity-80" aria-hidden="true" />
-                <span>{status === 'ALL' ? 'All Statuses' : status}</span>
+                <span>
+                  {status === 'ALL'
+                    ? t.allStatuses
+                    : translateStatus(status, language)}
+                </span>
               </button>
             );
           })}
@@ -163,7 +171,7 @@ export function TrackIssuesView({
               aria-label="Search civic complaints"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search street, title, or department..."
+              placeholder={t.searchPlaceholder}
               className="min-h-[38px] w-full rounded-full border border-slate-300 bg-white py-1.5 pr-4 pl-10 text-xs font-medium text-[#11131a] placeholder:text-slate-500 sm:w-64 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400"
             />
           </div>
@@ -176,7 +184,7 @@ export function TrackIssuesView({
             }
             className="min-h-[38px] rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-[#11131a] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
           >
-            <option value="ALL">All Categories</option>
+            <option value="ALL">{t.allCategories}</option>
             {ISSUE_CATEGORIES.map((cat) => (
               <option key={cat} value={cat}>
                 {cat}
@@ -186,7 +194,7 @@ export function TrackIssuesView({
         </div>
       </div>
 
-      {/* Main Split Workspace (Responsive List + Overview Map) */}
+      {/* Main Split Workspace */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="flex flex-col gap-5 lg:col-span-7">
           {filteredIssues.length === 0 ? (
@@ -195,7 +203,7 @@ export function TrackIssuesView({
                 No complaints match the current filter
               </p>
               <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-300">
-                Clear the search box or switch status to &ldquo;All Statuses&rdquo;.
+                Clear the search box or switch status to &ldquo;{t.allStatuses}&rdquo;.
               </p>
             </div>
           ) : (
@@ -218,7 +226,6 @@ export function TrackIssuesView({
                       : 'hover:border-slate-300 dark:hover:border-slate-700'
                   }`}
                 >
-                  {/* Top Row: Category + Priority + Live SLA Countdown */}
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-[#11131a] dark:bg-slate-800 dark:text-white">
@@ -230,7 +237,7 @@ export function TrackIssuesView({
                             issue.priorityLevel,
                           )}`}
                         />
-                        {issue.priorityLevel} ·{' '}
+                        {translatePriority(issue.priorityLevel, language)} ·{' '}
                         <span className="tabular-nums font-mono">
                           {issue.urgencyScore}/10
                         </span>
@@ -265,11 +272,10 @@ export function TrackIssuesView({
                     </span>
                     <span className="inline-flex items-center gap-1 text-[#3730a3] dark:text-indigo-300">
                       <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      Dept: {issue.assignedDepartment}
+                      {translateDepartment(issue.assignedDepartment, language)}
                     </span>
                   </div>
 
-                  {/* Before & After Photo Proof Viewer */}
                   {(issue.imageDataUrl || afterPhoto) && (
                     <div className="surface-well mt-4 grid grid-cols-1 gap-3 p-3 sm:grid-cols-2">
                       {issue.imageDataUrl && (
@@ -311,7 +317,7 @@ export function TrackIssuesView({
                             : 'text-slate-500'
                         }
                       >
-                        1. Reported
+                        {t.stepReported}
                       </span>
                       <span
                         className={
@@ -320,7 +326,7 @@ export function TrackIssuesView({
                             : 'text-slate-500'
                         }
                       >
-                        2. In Progress
+                        {t.stepInProgress}
                       </span>
                       <span
                         className={
@@ -332,7 +338,7 @@ export function TrackIssuesView({
                         {stepIdx >= 3 && (
                           <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                         )}
-                        3. Resolved
+                        {t.stepResolved}
                       </span>
                     </div>
 
@@ -362,7 +368,9 @@ export function TrackIssuesView({
 
                     {issue.resolutionNotes && (
                       <p className="mt-2.5 border-t border-slate-200/90 pt-2 text-xs text-slate-800 dark:border-slate-800 dark:text-slate-200">
-                        <strong className="font-bold">Municipal Update:</strong>{' '}
+                        <strong className="font-bold">
+                          {t.municipalUpdateLabel}
+                        </strong>{' '}
                         {issue.resolutionNotes}
                       </p>
                     )}
@@ -370,7 +378,9 @@ export function TrackIssuesView({
 
                   {/* Card Footer */}
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
-                    <span>Reported by {issue.reporterDisplayName}</span>
+                    <span>
+                      {t.reportedByLabel} {issue.reporterDisplayName}
+                    </span>
 
                     <div className="flex flex-wrap items-center gap-2">
                       <button
@@ -400,7 +410,8 @@ export function TrackIssuesView({
                       >
                         <ThumbsUp className="h-3.5 w-3.5" aria-hidden="true" />
                         <span className="tabular-nums">
-                          {hasVoted ? 'Upvoted' : '+1 Affected'} ({issue.upvoteCount})
+                          {hasVoted ? t.upvotedLabel : t.upvoteActionLabel} (
+                          {issue.upvoteCount})
                         </span>
                       </button>
                     </div>
@@ -416,7 +427,7 @@ export function TrackIssuesView({
           <div className="surface-card sticky top-4 p-4 sm:p-5">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-base font-bold text-[#11131a] dark:text-white">
-                Community Issue Map
+                {t.communityMapTitle}
               </h2>
               <span className="tabular-nums text-xs font-semibold text-slate-600 dark:text-slate-300">
                 Showing {filteredIssues.length} pin(s)

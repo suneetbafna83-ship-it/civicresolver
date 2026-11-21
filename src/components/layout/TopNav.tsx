@@ -16,6 +16,7 @@ import type {
 } from '../../../shared/types/civic.js';
 import {
   getUiStrings,
+  translateDepartment,
   type AppLanguage,
 } from '../../lib/i18n/translations.js';
 
@@ -52,10 +53,10 @@ export function TopNav({
   const t = getUiStrings(language);
 
   const activeHeadline = !session
-    ? 'Portal Authentication Gate'
+    ? 'CivicResolve'
     : isAdmin
       ? scopedDept !== null
-        ? `${scopedDept} Command`
+        ? translateDepartment(scopedDept, language)
         : t.tabAdmin
       : activeTab === 'track'
         ? t.tabTrack
@@ -85,7 +86,7 @@ export function TopNav({
 
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="truncate text-sm font-bold tracking-tight text-[#11131a] sm:text-base dark:text-white">
-              {!session ? 'CivicResolve' : activeHeadline}
+              {activeHeadline}
             </span>
 
             {session ? (
@@ -100,34 +101,30 @@ export function TopNav({
                 <span>
                   {isAdmin
                     ? scopedDept !== null
-                      ? `${scopedDept} Only`
-                      : 'All-Dept Admin'
-                    : 'Citizen Workspace'}
+                      ? `${translateDepartment(scopedDept, language)} ${t.onlyTag}`
+                      : t.allDeptAdminTag
+                    : t.citizenWorkspaceTag}
                 </span>
               </span>
             ) : (
               <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-semibold text-[#3730a3] dark:bg-indigo-950/70 dark:text-indigo-200">
-                Strict RBAC Sign-In Gate
+                {t.gateBadge}
               </span>
             )}
           </div>
         </div>
 
-        {/* Right: Language Toggle + Signed-In Identity + Sign Out + Theme */}
+        {/* Right: EN / हिंदी / தமிழ் Language Toggle + Signed-In Identity + Sign Out + Theme */}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={onToggleLanguage}
-            aria-label="Toggle language between English and Hindi"
-            className="press-feedback inline-flex min-h-[38px] items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50/85 px-3 py-1.5 text-xs font-bold text-[#3730a3] hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-200"
+            aria-label="Toggle language between English and Hindi and Tamil"
+            className="press-feedback inline-flex min-h-[38px] items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50/85 px-3 py-1.5 text-xs font-bold text-[#3730a3] hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-200"
           >
-            <Globe className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">
-              {language === 'en' ? 'EN / हिंदी' : 'हिंदी / EN'}
-            </span>
-            <span className="sm:hidden">
-              {language === 'en' ? 'EN' : 'हिं'}
-            </span>
+            <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className="hidden sm:inline">{t.languageBadge}</span>
+            <span className="sm:hidden">{t.languageShort}</span>
           </button>
 
           {session && (
@@ -157,7 +154,7 @@ export function TopNav({
               >
                 <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
                 <span className="hidden sm:inline">{t.signOutSwitch}</span>
-                <span className="sm:hidden">Switch</span>
+                <span className="sm:hidden">{t.switchShort}</span>
               </button>
             </>
           )}

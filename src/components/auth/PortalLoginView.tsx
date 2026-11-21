@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Building2,
-  Droplets,
   Lock,
   ShieldCheck,
   User,
@@ -11,8 +10,14 @@ import {
   DEPARTMENTS,
   type Department,
 } from '../../../shared/types/civic.js';
+import {
+  getUiStrings,
+  translateDepartment,
+  type AppLanguage,
+} from '../../lib/i18n/translations.js';
 
 export interface PortalLoginViewProps {
+  readonly language?: AppLanguage;
   readonly onCitizenGuestSignIn: () => Promise<void>;
   readonly onCitizenGoogleSignIn: () => Promise<void>;
   readonly onCitizenEmailSignIn: (
@@ -35,6 +40,7 @@ export interface PortalLoginViewProps {
 }
 
 export function PortalLoginView({
+  language = 'en',
   onCitizenGuestSignIn,
   onCitizenGoogleSignIn,
   onCitizenEmailSignIn,
@@ -42,6 +48,8 @@ export function PortalLoginView({
   onAdminSignIn,
   onAdminQuickDemoSignIn,
 }: PortalLoginViewProps): React.ReactElement {
+  const t = getUiStrings(language);
+
   // Citizen Login Form State
   const [citizenMode, setCitizenMode] = useState<'signin' | 'signup'>('signin');
   const [citizenEmail, setCitizenEmail] = useState('');
@@ -88,7 +96,7 @@ export function PortalLoginView({
     e.preventDefault();
     setAdminError(null);
     if (adminEmail.trim().length < 3 || adminPasscode.length < 4) {
-      setAdminError('Enter valid verified municipal officer email and passcode.');
+      setAdminError('Enter valid municipal officer email and department passkey.');
       return;
     }
     setAdminBusy(true);
@@ -110,23 +118,23 @@ export function PortalLoginView({
   return (
     <section
       aria-labelledby="portal-gate-heading"
-      className="mx-auto flex h-full max-w-6xl flex-col justify-center px-5 py-4 sm:px-8"
+      className="mx-auto flex h-full max-w-6xl flex-col justify-center px-4 py-4 sm:px-8"
     >
-      {/* Compact Single-Screen Editorial Header (Zero vertical scroll required) */}
-      <div className="mb-4 text-center">
+      {/* Prominent Editorial Hero Header */}
+      <div className="mb-5 text-center">
         <h1
           id="portal-gate-heading"
-          className="text-xl font-bold tracking-tight sm:text-2xl"
+          className="text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl"
         >
           <span className="text-slate-500 dark:text-slate-400">
-            Welcome to CivicResolve,{' '}
+            {t.gateWelcomePrefix}{' '}
           </span>
           <span className="text-[#11131a] dark:text-white">
-            Select Your Dedicated Workspace
+            {t.gateWelcomeMain}
           </span>
         </h1>
-        <p className="mx-auto mt-1 max-w-xl text-xs text-slate-700 dark:text-slate-300">
-          Citizen and Municipal Admin workspaces are strictly isolated. Sign in to the portal that matches your role.
+        <p className="mx-auto mt-1.5 max-w-2xl text-xs text-slate-700 sm:text-sm dark:text-slate-300">
+          {t.gateSubtitle}
         </p>
       </div>
 
@@ -138,9 +146,9 @@ export function PortalLoginView({
           className="surface-card flex flex-col justify-between gap-3.5 p-5"
         >
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5 dark:border-slate-800">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#11131a] text-white dark:bg-white dark:text-[#11131a]">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#11131a] text-white dark:bg-white dark:text-[#11131a]">
                   <User className="h-4 w-4" aria-hidden="true" />
                 </div>
                 <div>
@@ -148,15 +156,15 @@ export function PortalLoginView({
                     id="citizen-login-heading"
                     className="text-base font-bold text-[#11131a] dark:text-white"
                   >
-                    Citizen Portal Sign In
+                    {t.citizenPortalTitle}
                   </h2>
                   <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                    Access: 1. Report Issue &amp; 2. Track Complaints
+                    {t.citizenPortalSub}
                   </p>
                 </div>
               </div>
               <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-[#11131a] dark:bg-slate-800 dark:text-white">
-                Citizen Role
+                {t.citizenRoleBadge}
               </span>
             </div>
 
@@ -166,10 +174,10 @@ export function PortalLoginView({
                 type="button"
                 disabled={citizenBusy}
                 onClick={() => void onCitizenGuestSignIn()}
-                className="press-feedback inline-flex items-center justify-center gap-1.5 rounded-full bg-[#11131a] px-3.5 py-2 text-xs font-semibold text-white hover:opacity-90 dark:bg-white dark:text-[#11131a]"
+                className="press-feedback inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-full bg-[#11131a] px-3.5 py-2 text-xs font-semibold text-white hover:opacity-90 dark:bg-white dark:text-[#11131a]"
               >
-                <User className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Enter Citizen Workspace</span>
+                <User className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>{t.enterCitizenWorkspace}</span>
               </button>
 
               <button
@@ -188,10 +196,10 @@ export function PortalLoginView({
                     })
                     .finally(() => setCitizenBusy(false));
                 }}
-                className="press-feedback inline-flex items-center justify-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-[#11131a] hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                className="press-feedback inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-[#11131a] hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
               >
-                <UserCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Citizen Google Sign-In</span>
+                <UserCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>{t.citizenGoogleBtn}</span>
               </button>
             </div>
 
@@ -200,11 +208,11 @@ export function PortalLoginView({
               onSubmit={(e) => void handleCitizenSubmit(e)}
               className="flex flex-col gap-2.5"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-bold text-[#11131a] dark:text-white">
                   {citizenMode === 'signin'
-                    ? 'Citizen Email & Password'
-                    : 'Register Citizen Account'}
+                    ? t.citizenEmailHeading
+                    : t.citizenRegisterHeading}
                 </span>
                 <button
                   type="button"
@@ -216,8 +224,8 @@ export function PortalLoginView({
                   className="text-[11px] font-semibold text-slate-700 underline hover:text-[#11131a] dark:text-slate-300 dark:hover:text-white"
                 >
                   {citizenMode === 'signin'
-                    ? 'Create citizen account'
-                    : 'Have an account? Sign in'}
+                    ? t.createCitizenLink
+                    : t.haveAccountLink}
                 </button>
               </div>
 
@@ -227,7 +235,7 @@ export function PortalLoginView({
                     htmlFor="citizen-name-input"
                     className="block text-[11px] font-semibold text-[#11131a] dark:text-white"
                   >
-                    Full Name
+                    {t.fullNameLabel}
                   </label>
                   <input
                     id="citizen-name-input"
@@ -247,7 +255,7 @@ export function PortalLoginView({
                     htmlFor="citizen-email-input"
                     className="block text-[11px] font-semibold text-[#11131a] dark:text-white"
                   >
-                    Citizen Email
+                    {t.citizenEmailLabel}
                   </label>
                   <input
                     id="citizen-email-input"
@@ -265,7 +273,7 @@ export function PortalLoginView({
                     htmlFor="citizen-password-input"
                     className="block text-[11px] font-semibold text-[#11131a] dark:text-white"
                   >
-                    Password
+                    {t.passwordLabel}
                   </label>
                   <input
                     id="citizen-password-input"
@@ -292,20 +300,20 @@ export function PortalLoginView({
               <button
                 type="submit"
                 disabled={citizenBusy}
-                className="press-feedback rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-[#11131a] hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                className="press-feedback min-h-[38px] rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-[#11131a] hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
               >
                 {citizenBusy
-                  ? 'Signing In Citizen...'
+                  ? t.submittingLabel
                   : citizenMode === 'signin'
-                    ? 'Sign In as Citizen with Email'
-                    : 'Create Citizen Account'}
+                    ? t.citizenEmailSubmit
+                    : t.citizenRegisterSubmit}
               </button>
             </form>
           </div>
 
           <p className="border-t border-slate-200/80 pt-2 text-[11px] font-medium text-slate-600 dark:border-slate-800 dark:text-slate-300">
             <Lock className="mr-1 inline h-3 w-3" aria-hidden="true" />
-            Citizen accounts cannot access the Municipal Admin Command Desk.
+            {t.citizenLockNote}
           </p>
         </article>
 
@@ -315,9 +323,9 @@ export function PortalLoginView({
           className="surface-card flex flex-col justify-between gap-3.5 p-5"
         >
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5 dark:border-slate-800">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#11131a] text-white dark:bg-white dark:text-[#11131a]">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#11131a] text-white dark:bg-white dark:text-[#11131a]">
                   <ShieldCheck className="h-4 w-4" aria-hidden="true" />
                 </div>
                 <div>
@@ -325,53 +333,43 @@ export function PortalLoginView({
                     id="admin-login-heading"
                     className="text-base font-bold text-[#11131a] dark:text-white"
                   >
-                    Municipal Admin Sign In
+                    {t.adminPortalTitle}
                   </h2>
                   <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                    Access: Admin Command Desk &amp; Department Dispatch Only
+                    {t.adminPortalSub}
                   </p>
                 </div>
               </div>
               <span className="shrink-0 whitespace-nowrap rounded-full bg-[#11131a] px-2.5 py-0.5 text-[11px] font-bold text-white dark:bg-white dark:text-[#11131a]">
-                Admin Role
+                {t.adminRoleBadge}
               </span>
             </div>
 
-            {/* Instant Admin Demo Entry (Scoped Water Dept + Full City Ops) */}
-            <div className="surface-well grid grid-cols-1 gap-2 p-2.5 sm:grid-cols-2">
-              <button
-                type="button"
-                disabled={adminBusy}
-                onClick={() => void onAdminQuickDemoSignIn('Water & Sewage')}
-                className="press-feedback inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-full bg-[#3730a3] px-3 py-2 text-xs font-semibold text-white hover:bg-[#312e81]"
-              >
-                <Droplets className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span>Water Dept Staff Only (Demo)</span>
-              </button>
-
+            {/* 1-Click Demo Admin ONLY (No Staff Demo Button) */}
+            <div className="surface-well p-2.5">
               <button
                 type="button"
                 disabled={adminBusy}
                 onClick={() => void onAdminQuickDemoSignIn(null)}
-                className="press-feedback inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-full bg-[#581c87] px-3 py-2 text-xs font-semibold text-white hover:bg-[#4c1d95]"
+                className="press-feedback flex min-h-[40px] w-full items-center justify-center gap-2 rounded-full bg-[#11131a] px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-[#11131a]"
               >
                 <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span>Enter Admin Command Desk (1-Click Demo Admin)</span>
+                <span>{t.enterAdminDemoBtn}</span>
               </button>
             </div>
 
-            {/* Verified Firebase Officer Credentials Form with Department Clearance */}
+            {/* Verified Department Staff & Officer Credentials Form */}
             <form
               onSubmit={(e) => void handleAdminSubmit(e)}
               className="flex flex-col gap-2"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold text-[#11131a] dark:text-white">
-                  Verified Municipal Officer Sign In
+                  {t.verifiedOfficerHeading}
                 </span>
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#581c87] dark:text-purple-300">
                   <Building2 className="h-3 w-3" aria-hidden="true" />
-                  Role &amp; Dept Checked
+                  {t.roleDeptCheckedBadge}
                 </span>
               </div>
 
@@ -380,7 +378,7 @@ export function PortalLoginView({
                   htmlFor="admin-department-select"
                   className="block text-[11px] font-semibold text-[#11131a] dark:text-white"
                 >
-                  Department Clearance Scope
+                  {t.deptClearanceLabel}
                 </label>
                 <select
                   id="admin-department-select"
@@ -392,10 +390,10 @@ export function PortalLoginView({
                 >
                   {DEPARTMENTS.map((dept) => (
                     <option key={dept} value={dept}>
-                      {dept} (Scoped Staff Only)
+                      {translateDepartment(dept, language)} ({t.scopedStaffSuffix})
                     </option>
                   ))}
-                  <option value="ALL">All Departments (City Ops Super Admin)</option>
+                  <option value="ALL">{t.allDeptsSuperAdmin}</option>
                 </select>
               </div>
 
@@ -405,7 +403,7 @@ export function PortalLoginView({
                     htmlFor="admin-email-input"
                     className="block text-[11px] font-semibold text-[#11131a] dark:text-white"
                   >
-                    Verified Officer Email
+                    {t.officerEmailLabel}
                   </label>
                   <input
                     id="admin-email-input"
@@ -413,7 +411,7 @@ export function PortalLoginView({
                     required
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
-                    placeholder="water.staff@municipal.gov"
+                    placeholder="water.staff@civicresolve.gov"
                     className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-[#11131a] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                   />
                 </div>
@@ -423,7 +421,7 @@ export function PortalLoginView({
                     htmlFor="admin-passcode-input"
                     className="block text-[11px] font-semibold text-[#11131a] dark:text-white"
                   >
-                    Officer Password
+                    {t.officerPasskeyLabel}
                   </label>
                   <input
                     id="admin-passcode-input"
@@ -432,7 +430,7 @@ export function PortalLoginView({
                     minLength={4}
                     value={adminPasscode}
                     onChange={(e) => setAdminPasscode(e.target.value)}
-                    placeholder="Firebase Auth password"
+                    placeholder="Department passkey"
                     className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-[#11131a] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                   />
                 </div>
@@ -453,15 +451,19 @@ export function PortalLoginView({
                 className="press-feedback min-h-[38px] rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-[#11131a] hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
               >
                 {adminBusy
-                  ? 'Verifying Clearance & Department...'
-                  : `Sign In (${adminDepartment === 'ALL' ? 'All Depts' : adminDepartment})`}
+                  ? t.analyzingLabel
+                  : `${t.adminSignInSubmit} (${
+                      adminDepartment === 'ALL'
+                        ? t.allDepartments
+                        : translateDepartment(adminDepartment, language)
+                    })`}
               </button>
             </form>
           </div>
 
           <p className="border-t border-slate-200/80 pt-2 text-[11px] font-medium text-slate-600 dark:border-slate-800 dark:text-slate-300">
             <Lock className="mr-1 inline h-3 w-3" aria-hidden="true" />
-            Department staff cannot view, query, or update other departments&apos; tasks.
+            {t.adminLockNote}
           </p>
         </article>
       </div>

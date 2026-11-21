@@ -314,5 +314,37 @@ describe('AuthService', () => {
         'Water & Sewage',
       ),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    // PBKDF2-SHA256 verified department roster login works offline without Firebase Auth
+    const offlineRosterService = createAuthService({
+      isFirebaseConfigured: () => false,
+      getAuthInstance: () => null,
+      sessionStorage: createInMemoryAuthStorage(),
+    });
+    const waterOfficer = await offlineRosterService.signInDepartmentOfficer(
+      'water.staff@civicresolve.gov',
+      'Water#2026',
+      'Water & Sewage',
+    );
+    expect(waterOfficer.role).toBe('admin');
+    expect(waterOfficer.assignedDepartment).toBe('Water & Sewage');
+
+    // Wrong passkey rejects with INVALID_CREDENTIALS
+    await expect(
+      offlineRosterService.signInDepartmentOfficer(
+        'water.staff@civicresolve.gov',
+        'WrongPass999',
+        'Water & Sewage',
+      ),
+    ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
+
+    // Water officer attempting Roads department rejects with FORBIDDEN
+    await expect(
+      offlineRosterService.signInDepartmentOfficer(
+        'water.staff@civicresolve.gov',
+        'Water#2026',
+        'Roads & Infrastructure',
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });

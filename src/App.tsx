@@ -20,7 +20,11 @@ import {
   loadResolutionPhotosMap,
   saveResolutionPhoto,
 } from './lib/export/civicExport.js';
-import type { AppLanguage } from './lib/i18n/translations.js';
+import {
+  getNextAppLanguage,
+  getUiStrings,
+  type AppLanguage,
+} from './lib/i18n/translations.js';
 import { createDefaultIssueRepository } from './lib/repositories/hybridIssueRepository.js';
 import { AdminDashboardView } from './components/admin/AdminDashboardView.js';
 import { PortalLoginView } from './components/auth/PortalLoginView.js';
@@ -241,6 +245,7 @@ export function App(): React.ReactElement {
     () => issues.filter((item) => item.status !== 'Resolved').length,
     [issues],
   );
+  const t = getUiStrings(language);
 
   // Single-page locked desktop viewport for Sign-In Gate and Report Issue (scrollable on mobile & dashboards)
   const isSinglePageDesktop =
@@ -295,7 +300,7 @@ export function App(): React.ReactElement {
                 darkTheme={darkTheme}
                 language={language}
                 onToggleLanguage={() =>
-                  setLanguage((prev) => (prev === 'en' ? 'hi' : 'en'))
+                  setLanguage((prev) => getNextAppLanguage(prev))
                 }
                 onToggleTheme={() => setDarkTheme((prev) => !prev)}
                 onSignOutPortal={() => void handleSignOutPortal()}
@@ -340,6 +345,7 @@ export function App(): React.ReactElement {
                 >
                   {!session ? (
                     <PortalLoginView
+                      language={language}
                       onCitizenGuestSignIn={async () => {
                         const guest = await authService.signInAsGuest();
                         activateSession(guest);
@@ -439,6 +445,7 @@ export function App(): React.ReactElement {
                       issues={issues}
                       session={session}
                       resolutionPhotos={resolutionPhotos}
+                      language={language}
                       onAttachResolutionPhoto={handleAttachResolutionPhoto}
                       onEnableDemoAdmin={async () => {
                         const adminSession =
@@ -455,7 +462,7 @@ export function App(): React.ReactElement {
               <footer className="border-t border-slate-200/70 px-4 py-2.5 text-xs font-medium text-slate-700 sm:px-6 dark:border-slate-800/80 dark:text-slate-300">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[11px] sm:text-xs">
-                    CivicResolve · Scoped Department RBAC · Google Gemini, Firebase Spark &amp; Maps
+                    {t.footerNotice}
                   </span>
 
                   <button
@@ -464,7 +471,7 @@ export function App(): React.ReactElement {
                     className="press-feedback inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-[#3730a3] px-3.5 py-1 font-mono text-[11px] font-semibold text-white hover:bg-[#312e81]"
                   >
                     <Compass className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>UI Spec Sheet (CAD)</span>
+                    <span>{t.cadSpecBtn}</span>
                   </button>
                 </div>
               </footer>

@@ -189,20 +189,49 @@ describe('CivicResolve Phase 2 Frontend UI, Dual-Portal Login & Strict Workspace
     fireEvent.click(langBtn);
 
     fireEvent.click(
-      screen.getByRole('button', { name: /Enter Citizen Workspace/i }),
+      screen.getByRole('button', { name: /नागरिक कार्यक्षेत्र में प्रवेश करें/i }),
     );
     await waitFor(() => {
       expect(screen.getByText(/स्थानीय समस्या की रिपोर्ट करें/i)).toBeDefined();
     });
   });
 
-  it('scopes Water & Sewage Staff Demo exclusively to Water & Sewage tasks and renders mobile drawer controls', async () => {
+  it('scopes Water & Sewage Staff via PBKDF2 passkey login exclusively to Water & Sewage tasks, verifies Tamil translation, and renders mobile drawer controls', async () => {
     render(<App />);
 
-    const waterStaffBtn = screen.getByRole('button', {
-      name: /Water Dept Staff Only \(Demo\)/i,
+    // Cycle language EN -> HI -> TA and verify Tamil UI rendering on Login Gate
+    const langBtn = screen.getByRole('button', {
+      name: /Toggle language between English and Hindi/i,
     });
-    fireEvent.click(waterStaffBtn);
+    fireEvent.click(langBtn); // HI
+    fireEvent.click(langBtn); // TA
+    expect(
+      screen.getByText(/CivicResolve-க்கு வரவேற்கிறோம்/i),
+    ).toBeDefined();
+    fireEvent.click(langBtn); // back to EN
+
+    // Confirm staff 1-click demo button is removed while 1-click Demo Admin remains
+    expect(
+      screen.queryByRole('button', { name: /Water Dept Staff Only \(Demo\)/i }),
+    ).toBeNull();
+    expect(
+      screen.getByRole('button', {
+        name: /Enter Admin Command Desk \(1-Click Demo Admin\)/i,
+      }),
+    ).toBeDefined();
+
+    // Sign in as Water & Sewage Officer with verified PBKDF2 passkey
+    fireEvent.change(screen.getByLabelText(/Officer Email/i), {
+      target: { value: 'water.staff@civicresolve.gov' },
+    });
+    fireEvent.change(screen.getByLabelText(/Department Passkey/i), {
+      target: { value: 'Water#2026' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /Sign In as Department Officer \(Water & Sewage\)/i,
+      }),
+    );
 
     await waitFor(() => {
       expect(
@@ -233,5 +262,13 @@ describe('CivicResolve Phase 2 Frontend UI, Dual-Portal Login & Strict Workspace
     expect(
       screen.queryByRole('button', { name: /^Roads & Infrastructure$/i }),
     ).toBeNull();
+
+    // Cross-department handover request trigger & Audit Log toggle are available
+    expect(
+      screen.getAllByRole('button', { name: /Request Dept Handover/i }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('button', { name: /Immutable Municipal Audit Log/i }),
+    ).toBeDefined();
   });
 });

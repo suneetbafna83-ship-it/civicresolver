@@ -25,7 +25,8 @@
   - `src/components/map/CivicMap.tsx`
   - `src/components/spec/DimensionalSpecModal.tsx`
   - `src/lib/api/triageClient.ts`
-  - `src/lib/firebase/config.ts`, `src/lib/auth/authService.ts`, `src/lib/auth/passwordHasher.ts`
+  - `src/lib/firebase/config.ts`, `src/lib/auth/authService.ts`, `src/lib/auth/passwordHasher.ts`, `src/lib/auth/departmentRoster.ts`
+  - `src/lib/admin/adminWorkflowStore.ts`, `src/lib/i18n/translations.ts`
   - `src/lib/media/imageValidation.ts`, `src/lib/media/imageCompressor.ts`
   - `src/lib/voice/useSpeechToText.ts`
   - `src/lib/repositories/issueRepository.ts`, `firestoreIssueRepository.ts`, `localIssueRepository.ts`, `hybridIssueRepository.ts`, `seedIssues.ts`
