@@ -34,10 +34,16 @@ import {
   findRosterOfficerByEmail,
   verifyRosterOfficerPasskey,
 } from './departmentRoster.js';
+import {
+  hashPasswordPbkdf2,
+  verifyPasswordPbkdf2,
+} from './passwordHasher.js';
 
 export const PREVIEW_ADMIN_STORAGE_KEY = 'civicresolve.previewAdmin.v1';
 export const PREVIEW_ADMIN_DEPT_STORAGE_KEY = 'civicresolve.previewAdminDept.v1';
 export const LOCAL_GUEST_STORAGE_KEY = 'civicresolve.localGuest.v1';
+export const LOCAL_CITIZEN_ACCOUNTS_STORAGE_KEY =
+  'civicresolve.citizenAccounts.v1';
 
 export type AuthServiceErrorCode =
   | 'FIREBASE_NOT_CONFIGURED'
@@ -562,6 +568,60 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
     return client;
   }
 
+  function buildLocalCitizenAccountSession(
+    uid: string,
+    email: string,
+    displayName: string,
+    provider: 'password' | 'google' = 'password',
+  ): CivicSession {
+    return {
+      uid,
+      displayName,
+      email,
+      role: 'citizen',
+      assignedDepartment: null,
+      provider,
+      isAnonymous: false,
+      isPreviewAdmin: false,
+      isVerifiedFirebaseAdmin: false,
+      getIdToken: async () => null,
+    };
+  }
+
+  interface StoredCitizenAccount {
+    readonly uid: string;
+    readonly email: string;
+    readonly displayName: string;
+    readonly passwordHash: string;
+  }
+
+  function loadStoredCitizenAccounts(): StoredCitizenAccount[] {
+    try {
+      const raw = storage.getItem(LOCAL_CITIZEN_ACCOUNTS_STORAGE_KEY);
+      if (!raw) {
+        return [];
+      }
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed) ? (parsed as StoredCitizenAccount[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveStoredCitizenAccount(account: StoredCitizenAccount): void {
+    try {
+      const existing = loadStoredCitizenAccounts().filter(
+        (item) => item.email.toLowerCase() !== account.email.toLowerCase(),
+      );
+      storage.setItem(
+        LOCAL_CITIZEN_ACCOUNTS_STORAGE_KEY,
+        JSON.stringify([account, ...existing].slice(0, 50)),
+      );
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
   async function getCurrentSession(): Promise<CivicSession | null> {
     if (readPreviewAdminActive()) {
       return buildPreviewAdminSession(readPreviewAdminDepartment());
@@ -629,20 +689,57 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
         throw new AuthServiceError('INVALID_INPUT', 'Password is required');
       }
 
-      const client = requireConfiguredAuth();
-      try {
-        const cred = await fns.signInWithEmailAndPassword(
-          client,
-          emailParsed.data,
+      // Check local PBKDF2-SHA256 citizen account store first
+      const localMatch = loadStoredCitizenAccounts().find(
+        (acc) => acc.email.toLowerCase() === emailParsed.data.toLowerCase(),
+      );
+      if (localMatch !== undefined) {
+        const verified = await verifyPasswordPbkdf2(
           password,
+          localMatch.passwordHash,
         );
-        clearLocalSessionFlags();
-        const session = await mapFirebaseUserToSession(cred.user, 'password');
-        notifyListeners(session);
-        return session;
-      } catch (error) {
-        throw mapFirebaseAuthError(error);
+        if (verified) {
+          clearLocalSessionFlags();
+          const localSession = buildLocalCitizenAccountSession(
+            localMatch.uid,
+            localMatch.email,
+            localMatch.displayName,
+            'password',
+          );
+          notifyListeners(localSession);
+          return localSession;
+        }
       }
+
+      const client = isConfiguredFn() ? getAuthInstanceFn() : null;
+      if (client !== null) {
+        try {
+          const cred = await fns.signInWithEmailAndPassword(
+            client,
+            emailParsed.data,
+            password,
+          );
+          clearLocalSessionFlags();
+          const session = await mapFirebaseUserToSession(cred.user, 'password');
+          notifyListeners(session);
+          return session;
+        } catch (error) {
+          if (!isGuestFallbackError(error)) {
+            throw mapFirebaseAuthError(error);
+          }
+        }
+      }
+
+      if (localMatch !== undefined) {
+        throw new AuthServiceError(
+          'INVALID_CREDENTIALS',
+          'Incorrect email or password. Please verify your credentials and try again.',
+        );
+      }
+      throw new AuthServiceError(
+        'INVALID_CREDENTIALS',
+        'No citizen account found for this email. Click "Create citizen account" to sign up first.',
+      );
     },
 
     async signInDepartmentOfficer(
@@ -804,27 +901,55 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
         cleanDisplayName = nameParsed.data;
       }
 
-      const client = requireConfiguredAuth();
-      try {
-        const cred = await fns.createUserWithEmailAndPassword(
-          client,
-          emailParsed.data,
-          password,
-        );
-        if (cleanDisplayName !== undefined) {
-          await fns.updateProfile(cred.user, { displayName: cleanDisplayName });
+      const client = isConfiguredFn() ? getAuthInstanceFn() : null;
+      if (client !== null) {
+        try {
+          const cred = await fns.createUserWithEmailAndPassword(
+            client,
+            emailParsed.data,
+            password,
+          );
+          if (cleanDisplayName !== undefined) {
+            await fns.updateProfile(cred.user, {
+              displayName: cleanDisplayName,
+            });
+          }
+          clearLocalSessionFlags();
+          const session = await mapFirebaseUserToSession(
+            cred.user,
+            'password',
+            cleanDisplayName,
+          );
+          notifyListeners(session);
+          return session;
+        } catch (error) {
+          if (!isGuestFallbackError(error)) {
+            throw mapFirebaseAuthError(error);
+          }
         }
-        clearLocalSessionFlags();
-        const session = await mapFirebaseUserToSession(
-          cred.user,
-          'password',
-          cleanDisplayName,
-        );
-        notifyListeners(session);
-        return session;
-      } catch (error) {
-        throw mapFirebaseAuthError(error);
       }
+
+      // Offline / fallback PBKDF2-SHA256 local Citizen account creation
+      const derivedName =
+        cleanDisplayName ??
+        (emailParsed.data.split('@')[0]?.slice(0, 50) || 'Civic Citizen');
+      const passwordHash = await hashPasswordPbkdf2(password);
+      const uid = guestIdGenerator().replace(/^guest_/, 'citizen_');
+      saveStoredCitizenAccount({
+        uid,
+        email: emailParsed.data,
+        displayName: derivedName,
+        passwordHash,
+      });
+      clearLocalSessionFlags();
+      const fallbackSession = buildLocalCitizenAccountSession(
+        uid,
+        emailParsed.data,
+        derivedName,
+        'password',
+      );
+      notifyListeners(fallbackSession);
+      return fallbackSession;
     },
 
     async signInAsGuest(): Promise<CivicSession> {

@@ -198,30 +198,51 @@ export function PortalLoginView({
               </button>
             </div>
 
-            {/* Citizen Email & Password Form */}
+            {/* Citizen Email Sign-In & Sign-Up Form with Prominent Segmented Mode Switcher */}
             <form
               onSubmit={(e) => void handleCitizenSubmit(e)}
               className="flex flex-col gap-2.5"
             >
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold text-[#11131a] dark:text-white">
                   {citizenMode === 'signin'
                     ? t.citizenEmailHeading
                     : t.citizenRegisterHeading}
                 </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCitizenMode((prev) =>
-                      prev === 'signin' ? 'signup' : 'signin',
-                    )
-                  }
-                  className="text-[11px] font-semibold text-slate-700 underline hover:text-[#11131a] dark:text-slate-300 dark:hover:text-white"
+                <div
+                  role="group"
+                  aria-label="Citizen email authentication mode"
+                  className="inline-flex rounded-full border border-slate-300 bg-slate-100 p-0.5 dark:border-slate-700 dark:bg-slate-800"
                 >
-                  {citizenMode === 'signin'
-                    ? t.createCitizenLink
-                    : t.haveAccountLink}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCitizenMode('signin');
+                      setCitizenError(null);
+                    }}
+                    className={`rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${
+                      citizenMode === 'signin'
+                        ? 'bg-[#11131a] text-white dark:bg-white dark:text-[#11131a]'
+                        : 'text-slate-700 hover:text-[#11131a] dark:text-slate-300 dark:hover:text-white'
+                    }`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCitizenMode('signup');
+                      setCitizenError(null);
+                    }}
+                    className={`rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${
+                      citizenMode === 'signup'
+                        ? 'bg-[#11131a] text-white dark:bg-white dark:text-[#11131a]'
+                        : 'text-slate-700 hover:text-[#11131a] dark:text-slate-300 dark:hover:text-white'
+                    }`}
+                  >
+                    {t.createCitizenLink}
+                  </button>
+                </div>
               </div>
 
               {citizenMode === 'signup' && (
@@ -235,10 +256,9 @@ export function PortalLoginView({
                   <input
                     id="citizen-name-input"
                     type="text"
-                    required
                     value={citizenName}
                     onChange={(e) => setCitizenName(e.target.value)}
-                    placeholder="Rajesh Sharma"
+                    placeholder="Rajesh Sharma (optional)"
                     className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-[#11131a] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                   />
                 </div>
@@ -284,12 +304,45 @@ export function PortalLoginView({
               </div>
 
               {citizenError && (
-                <p
+                <div
                   role="alert"
-                  className="rounded-xl border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-900 dark:border-red-900 dark:bg-red-950/60 dark:text-red-200"
+                  className="flex flex-col gap-1.5 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-900 dark:border-red-900 dark:bg-red-950/60 dark:text-red-200"
                 >
-                  {citizenError}
-                </p>
+                  <span>{citizenError}</span>
+                  {citizenMode === 'signin' &&
+                    citizenEmail.includes('@') &&
+                    citizenPassword.length >= 6 && (
+                      <button
+                        type="button"
+                        disabled={citizenBusy}
+                        onClick={() => {
+                          setCitizenMode('signup');
+                          setCitizenError(null);
+                          setCitizenBusy(true);
+                          const fallbackName =
+                            citizenName.trim() ||
+                            citizenEmail.split('@')[0]?.replace(/[^a-zA-Z0-9 _.-]/g, ' ').trim() ||
+                            'Civic Citizen';
+                          void onCitizenEmailSignUp(
+                            citizenEmail,
+                            citizenPassword,
+                            fallbackName,
+                          )
+                            .catch((err: unknown) => {
+                              setCitizenError(
+                                err instanceof Error
+                                  ? err.message
+                                  : 'Could not register citizen account.',
+                              );
+                            })
+                            .finally(() => setCitizenBusy(false));
+                        }}
+                        className="w-fit rounded-full bg-[#11131a] px-3 py-1 text-[11px] font-bold text-white hover:bg-slate-800 dark:bg-white dark:text-[#11131a]"
+                      >
+                        New user? Click here to Sign Up &amp; Enter with this email
+                      </button>
+                    )}
+                </div>
               )}
 
               <button

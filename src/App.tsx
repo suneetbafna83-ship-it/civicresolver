@@ -123,14 +123,6 @@ export function App(): React.ReactElement {
     void refreshIssuesForSession(session);
   }, [refreshIssuesForSession, session]);
 
-  useEffect(() => {
-    void fetchApiHealth().then((health) => {
-      if (health) {
-        setAiConfigured(health.ai.configured);
-      }
-    });
-  }, []);
-
   const activateSession = useCallback((nextSession: CivicSession | null) => {
     setSession(nextSession);
     setMobileNavOpen(false);
@@ -140,6 +132,25 @@ export function App(): React.ReactElement {
       setActiveTab('report');
     }
   }, []);
+
+  useEffect(() => {
+    void fetchApiHealth().then((health) => {
+      if (health) {
+        setAiConfigured(health.ai.configured);
+      }
+    });
+    void authService
+      .completeGoogleRedirect()
+      .then((redirectUser) => {
+        if (redirectUser) {
+          activateSession({ ...redirectUser, role: 'citizen' });
+          showToast(
+            `Signed in to Citizen Workspace with Google as ${redirectUser.displayName}.`,
+          );
+        }
+      })
+      .catch(() => undefined);
+  }, [activateSession, showToast]);
 
   const handleSelectTab = useCallback(
     (requestedTab: ActiveTab) => {
