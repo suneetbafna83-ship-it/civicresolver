@@ -1,0 +1,331 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model (CivicResolve — Project: civic-sense-43d74)
+    // ===============================================================
+    //
+    // Zero Firebase Cloud Storage / Cloud Functions (Spark Plan $0).
+    //
+    // Collection: issues/{issueId}
+    // Fields (22 total, ZERO PII — no email, phone, or ipAddress):
+    //   - id: string (1..128 chars, equals issueId, immutable)
+    //   - title: string (5..120 chars, immutable)
+    //   - description: string (10..2000 chars, immutable)
+    //   - category: string (enum of 6 IssueCategory values, immutable)
+    //   - location: map { lat: number (-90..90), lng: number (-180..180), address: string (1..240) } (immutable)
+    //   - status: string ('Reported' on create; 'Reported' -> 'In Progress' | 'Resolved', 'In Progress' -> 'Resolved')
+    //   - priorityLevel: string ('Low' | 'Medium' | 'High' | 'Critical')
+    //   - urgencyScore: int (1..10, immutable)
+    //   - recommendedDepartment: string (enum of 5 Departments, immutable)
+    //   - assignedDepartment: string (enum of 5 Departments, admin-updatable)
+    //   - slaEstimateHours: number (> 0 && <= 720, immutable)
+    //   - slaSummary: string (1..160 chars, immutable)
+    //   - triageMeta: map {
+    //       engine: 'gemini' | 'nlp-fallback',
+    //       model: string (1..64),
+    //       cacheHit: bool,
+    //       authenticityStatus: 'likely_authentic' | 'uncertain' | 'flagged_mismatch',
+    //       authenticityReason: string (1..300),
+    //       potentialDuplicateIds: list (<= 10 strings, each 1..128 chars),
+    //       highestSimilarity: number (0..1)
+    //     } (immutable)
+    //   - imageDataUrl: string | null (WebP data URI <= 165000 chars / <= 122880 bytes, immutable)
+    //   - reporterUid: string (1..128 chars, == request.auth.uid on create, immutable)
+    //   - reporterDisplayName: string (1..50 chars, immutable)
+    //   - isGuest: bool (immutable)
+    //   - upvoteCount: int (== 1 on create; +1 via issue_votes getAfter() on citizen update)
+    //   - resolutionNotes: string (1..1000 chars) | null (null on create, admin-updatable)
+    //   - createdAt: timestamp (== request.time on create, immutable)
+    //   - updatedAt: timestamp (== request.time on create and every update)
+    //   - resolvedAt: timestamp | null (null on create; == request.time when transitioning to 'Resolved')
+    //
+    // Collection: issue_votes/{voteId}  (voteId == "{issueId}_{uid}")
+    // Fields (3 total):
+    //   - issueId: string (1..128 chars)
+    //   - uid: string (== request.auth.uid)
+    //   - createdAt: timestamp (== request.time)
+    //
+    // Collection: admins/{uid} (Console / Admin-SDK provisioned only)
+    //   - active: bool
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function isVerifiedAdmin() {
+      let adminPath = /databases/$(database)/documents/admins/$(request.auth.uid);
+      return isAuthenticated() && (
+        ('admin' in request.auth.token && request.auth.token.admin == true) ||
+        (exists(adminPath) && 'active' in get(adminPath).data && get(adminPath).data.active == true)
+      );
+    }
+
+    function hasExactKeys(mapData, allowedKeys) {
+      return mapData is map &&
+        mapData.keys().hasAll(allowedKeys) &&
+        mapData.keys().hasOnly(allowedKeys);
+    }
+
+    function isValidString(value, minLen, maxLen) {
+      return value is string && value.size() >= minLen && value.size() <= maxLen;
+    }
+
+    function isValidDepartment(dept) {
+      return dept in [
+        'Roads & Infrastructure',
+        'Sanitation & Waste',
+        'Electrical & Streetlights',
+        'Water & Sewage',
+        'Public Safety'
+      ];
+    }
+
+    function isValidPriorityLevel(priority) {
+      return priority in ['Low', 'Medium', 'High', 'Critical'];
+    }
+
+    function isValidIssueStatus(status) {
+      return status in ['Reported', 'In Progress', 'Resolved'];
+    }
+
+    function isValidIssueCategory(category) {
+      return category in [
+        'Pothole & Road Damage',
+        'Garbage & Illegal Dumping',
+        'Streetlight & Electrical',
+        'Water Leak & Sewage',
+        'Traffic & Public Safety',
+        'Other Civic Issue'
+      ];
+    }
+
+    function isValidWebpDataUrl(value) {
+      return value == null || (
+        value is string &&
+        value.size() >= 27 &&
+        value.size() <= 165000 &&
+        value.matches('^data:image/webp;base64,[A-Za-z0-9+/]+={0,2}$')
+      );
+    }
+
+    function isValidLocation(loc) {
+      return hasExactKeys(loc, ['lat', 'lng', 'address']) &&
+        loc.lat is number && loc.lat >= -90 && loc.lat <= 90 &&
+        loc.lng is number && loc.lng >= -180 && loc.lng <= 180 &&
+        isValidString(loc.address, 1, 240);
+    }
+
+    function isValidOptionalIdAt(list, idx) {
+      return list.size() <= idx || isValidString(list[idx], 1, 128);
+    }
+
+    function isValidDuplicateIdList(list) {
+      return list is list &&
+        list.size() <= 10 &&
+        isValidOptionalIdAt(list, 0) &&
+        isValidOptionalIdAt(list, 1) &&
+        isValidOptionalIdAt(list, 2) &&
+        isValidOptionalIdAt(list, 3) &&
+        isValidOptionalIdAt(list, 4) &&
+        isValidOptionalIdAt(list, 5) &&
+        isValidOptionalIdAt(list, 6) &&
+        isValidOptionalIdAt(list, 7) &&
+        isValidOptionalIdAt(list, 8) &&
+        isValidOptionalIdAt(list, 9);
+    }
+
+    function isValidTriageMeta(meta) {
+      return hasExactKeys(meta, [
+          'engine',
+          'model',
+          'cacheHit',
+          'authenticityStatus',
+          'authenticityReason',
+          'potentialDuplicateIds',
+          'highestSimilarity'
+        ]) &&
+        meta.engine in ['gemini', 'nlp-fallback'] &&
+        isValidString(meta.model, 1, 64) &&
+        meta.cacheHit is bool &&
+        meta.authenticityStatus in ['likely_authentic', 'uncertain', 'flagged_mismatch'] &&
+        isValidString(meta.authenticityReason, 1, 300) &&
+        isValidDuplicateIdList(meta.potentialDuplicateIds) &&
+        meta.highestSimilarity is number &&
+        meta.highestSimilarity >= 0 &&
+        meta.highestSimilarity <= 1;
+    }
+
+    // Domain Validator (called on BOTH create and update)
+    function isValidIssueSchema(data) {
+      return hasExactKeys(data, [
+          'id',
+          'title',
+          'description',
+          'category',
+          'location',
+          'status',
+          'priorityLevel',
+          'urgencyScore',
+          'recommendedDepartment',
+          'assignedDepartment',
+          'slaEstimateHours',
+          'slaSummary',
+          'triageMeta',
+          'imageDataUrl',
+          'reporterUid',
+          'reporterDisplayName',
+          'isGuest',
+          'upvoteCount',
+          'resolutionNotes',
+          'createdAt',
+          'updatedAt',
+          'resolvedAt'
+        ]) &&
+        isValidString(data.id, 1, 128) &&
+        isValidString(data.title, 5, 120) &&
+        isValidString(data.description, 10, 2000) &&
+        isValidIssueCategory(data.category) &&
+        isValidLocation(data.location) &&
+        isValidIssueStatus(data.status) &&
+        isValidPriorityLevel(data.priorityLevel) &&
+        data.urgencyScore is int &&
+        data.urgencyScore >= 1 &&
+        data.urgencyScore <= 10 &&
+        isValidDepartment(data.recommendedDepartment) &&
+        isValidDepartment(data.assignedDepartment) &&
+        data.slaEstimateHours is number &&
+        data.slaEstimateHours > 0 &&
+        data.slaEstimateHours <= 720 &&
+        isValidString(data.slaSummary, 1, 160) &&
+        isValidTriageMeta(data.triageMeta) &&
+        isValidWebpDataUrl(data.imageDataUrl) &&
+        isValidString(data.reporterUid, 1, 128) &&
+        isValidString(data.reporterDisplayName, 1, 50) &&
+        data.isGuest is bool &&
+        data.upvoteCount is int &&
+        data.upvoteCount >= 1 &&
+        (data.resolutionNotes == null || isValidString(data.resolutionNotes, 1, 1000)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp &&
+        (data.resolvedAt == null || data.resolvedAt is timestamp);
+    }
+
+    function isValidIssueCreate(data, issueId) {
+      return isValidIssueSchema(data) &&
+        data.id == issueId &&
+        data.reporterUid == request.auth.uid &&
+        data.status == 'Reported' &&
+        data.upvoteCount == 1 &&
+        data.resolutionNotes == null &&
+        data.createdAt == request.time &&
+        data.updatedAt == request.time &&
+        data.resolvedAt == null;
+    }
+
+    function isValidCitizenUpvoteUpdate(issueId) {
+      let votePath = /databases/$(database)/documents/issue_votes/$(issueId + '_' + request.auth.uid);
+      return isValidIssueSchema(request.resource.data) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvoteCount', 'updatedAt']) &&
+        request.resource.data.upvoteCount is int &&
+        resource.data.upvoteCount is int &&
+        request.resource.data.upvoteCount == resource.data.upvoteCount + 1 &&
+        request.resource.data.updatedAt == request.time &&
+        !exists(votePath) &&
+        getAfter(votePath) != null;
+    }
+
+    function isValidAdminStatusAndResolution(prev, next) {
+      let prevStatus = prev.status;
+      let nextStatus = next.status;
+      return (
+        (prevStatus == 'Reported' && nextStatus in ['Reported', 'In Progress', 'Resolved']) ||
+        (prevStatus == 'In Progress' && nextStatus in ['In Progress', 'Resolved']) ||
+        (prevStatus == 'Resolved' && nextStatus == 'Resolved')
+      ) && (
+        (nextStatus != 'Resolved' && next.resolvedAt == null) ||
+        (prevStatus != 'Resolved' && nextStatus == 'Resolved' && next.resolvedAt == request.time) ||
+        (prevStatus == 'Resolved' && nextStatus == 'Resolved' && next.resolvedAt == prev.resolvedAt)
+      );
+    }
+
+    function isValidAdminIssueUpdate() {
+      return isValidIssueSchema(request.resource.data) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'assignedDepartment',
+          'priorityLevel',
+          'resolutionNotes',
+          'updatedAt',
+          'resolvedAt'
+        ]) &&
+        request.resource.data.updatedAt == request.time &&
+        isValidAdminStatusAndResolution(resource.data, request.resource.data);
+    }
+
+    function isValidVoteCreate(data, voteId) {
+      return hasExactKeys(data, ['issueId', 'uid', 'createdAt']) &&
+        isValidString(data.issueId, 1, 128) &&
+        data.uid == request.auth.uid &&
+        voteId == data.issueId + '_' + request.auth.uid &&
+        data.createdAt == request.time &&
+        existsAfter(/databases/$(database)/documents/issues/$(data.issueId));
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /issues/{issueId} {
+      // Split get and list: request.query is undefined on single-doc get()
+      allow get: if isAuthenticated();
+      allow list: if isAuthenticated() &&
+        request.query.limit != null &&
+        request.query.limit >= 1 &&
+        request.query.limit <= 50;
+
+      allow create: if isAuthenticated() &&
+        isValidIssueCreate(request.resource.data, issueId);
+
+      allow update: if (isAuthenticated() && isValidCitizenUpvoteUpdate(issueId)) ||
+        (isVerifiedAdmin() && isValidAdminIssueUpdate());
+
+      allow delete: if false;
+    }
+
+    match /issue_votes/{voteId} {
+      // Owner can check own vote doc (including non-existent check via suffix slice)
+      allow get: if isAuthenticated() && (
+        (resource != null && resource.data.uid == request.auth.uid) ||
+        (resource == null &&
+          voteId.size() > request.auth.uid.size() + 1 &&
+          voteId[voteId.size() - request.auth.uid.size() - 1 : voteId.size()] == '_' + request.auth.uid)
+      );
+      allow list: if false;
+      allow create: if isAuthenticated() && isValidVoteCreate(request.resource.data, voteId);
+      allow update, delete: if false;
+    }
+
+    match /admins/{uid} {
+      allow get: if isOwner(uid);
+      allow list, write: if false;
+    }
+
+    // Default deny for any other path
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

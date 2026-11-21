@@ -1,0 +1,24 @@
+# Dependencies & build artifacts
+node_modules/
+dist/
+build/
+.vercel/
+coverage/
+*.tsbuildinfo
+.eslintcache
+
+# Environment & secrets (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Logs & Firebase local artifacts
+*.log
+npm-debug.log*
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+
+# OS / Editor
+.DS_Store
+Thumbs.db
