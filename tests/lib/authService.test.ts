@@ -170,6 +170,17 @@ describe('AuthService', () => {
     const adminSignIn = await service.signInWithEmail('ops@city.gov', 'StrongPass123');
     expect(adminSignIn.role).toBe('admin');
     expect(adminSignIn.isVerifiedFirebaseAdmin).toBe(true);
+
+    // Any brand-new user email calling signInWithEmail auto-provisions and signs in without failing
+    vi.mocked(fns.signInWithEmailAndPassword).mockRejectedValueOnce(
+      Object.assign(new Error('User not found'), { code: 'auth/invalid-credential' }),
+    );
+    const anyEmailUser = await service.signInWithEmail(
+      'any.new.citizen@gmail.com',
+      'AnyValidPass123',
+    );
+    expect(anyEmailUser.role).toBe('citizen');
+    expect(anyEmailUser.email).toBe('any.new.citizen@gmail.com');
   });
 
   it('supports Guest Citizen via Firebase anonymous auth and local-guest fallback when unconfigured or offline', async () => {

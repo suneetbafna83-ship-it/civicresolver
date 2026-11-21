@@ -303,6 +303,10 @@ export function PortalLoginView({
                 </div>
               </div>
 
+              <p className="text-[11px] font-medium text-emerald-800 dark:text-emerald-300">
+                ✓ Any valid email ID works — new emails are automatically registered &amp; signed in.
+              </p>
+
               {citizenError && (
                 <div
                   role="alert"
