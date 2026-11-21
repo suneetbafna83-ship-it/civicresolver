@@ -40,6 +40,8 @@ export interface TopNavProps {
 
 export function TopNav({
   activeTab,
+  onSelectTab,
+  totalIssuesCount,
   session,
   darkTheme,
   language,
@@ -49,6 +51,7 @@ export function TopNav({
   onOpenMobileNav,
 }: TopNavProps): React.ReactElement {
   const isAdmin = session?.role === 'admin';
+  const isCitizen = session?.role === 'citizen';
   const scopedDept = isAdmin ? (session?.assignedDepartment ?? null) : null;
   const t = getUiStrings(language);
 
@@ -114,8 +117,25 @@ export function TopNav({
           </div>
         </div>
 
-        {/* Right: EN / हिंदी / தமிழ் Language Toggle + Signed-In Identity + Sign Out + Theme */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Right: Mobile Quick Switch + EN / हिंदी / தமிழ் Language Toggle + Signed-In Identity + Sign Out + Theme */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          {isCitizen && (
+            <button
+              type="button"
+              onClick={() =>
+                onSelectTab(activeTab === 'report' ? 'track' : 'report')
+              }
+              aria-label="Quick switch citizen mobile view"
+              className="press-feedback inline-flex min-h-[38px] items-center gap-1 rounded-full bg-[#0f766e] px-3 py-1.5 text-xs font-bold text-white shadow-xs lg:hidden"
+            >
+              <span>
+                {activeTab === 'report'
+                  ? `Track (${totalIssuesCount})`
+                  : 'New Report'}
+              </span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onToggleLanguage}

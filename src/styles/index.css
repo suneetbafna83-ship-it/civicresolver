@@ -227,6 +227,8 @@ html:has(.dark) {
 
 /* Fluid Tactile Response */
 .press-feedback {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
   transition:
     transform 150ms var(--ease-spring),
     background-color 140ms var(--ease-out),
