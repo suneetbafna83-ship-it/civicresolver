@@ -15,17 +15,6 @@ export interface FirebaseClientServices {
   readonly auth: Auth;
 }
 
-interface ViteFirebaseEnvShape {
-  readonly VITE_FIREBASE_API_KEY?: string;
-  readonly VITE_FIREBASE_AUTH_DOMAIN?: string;
-  readonly VITE_FIREBASE_PROJECT_ID?: string;
-  readonly VITE_FIREBASE_APP_ID?: string;
-}
-
-interface ImportMetaWithEnv extends ImportMeta {
-  readonly env?: ViteFirebaseEnvShape;
-}
-
 const PLACEHOLDER_EXACT_VALUES = new Set([
   '',
   'undefined',
@@ -51,9 +40,36 @@ const PLACEHOLDER_PREFIXES = [
 const firestoreCache = new WeakMap<FirebaseApp, Firestore>();
 const authCache = new WeakMap<FirebaseApp, Auth>();
 
-function readViteMetaEnv(): ViteFirebaseEnvShape | undefined {
-  const meta: ImportMetaWithEnv = import.meta;
-  return meta.env;
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_FIREBASE_API_KEY?: string;
+    readonly VITE_FIREBASE_AUTH_DOMAIN?: string;
+    readonly VITE_FIREBASE_PROJECT_ID?: string;
+    readonly VITE_FIREBASE_APP_ID?: string;
+  }
+
+  interface ImportMeta {
+    readonly env?: ImportMetaEnv;
+  }
+}
+
+function readViteMetaEnvValue(
+  key:
+    | 'VITE_FIREBASE_API_KEY'
+    | 'VITE_FIREBASE_AUTH_DOMAIN'
+    | 'VITE_FIREBASE_PROJECT_ID'
+    | 'VITE_FIREBASE_APP_ID',
+): string | undefined {
+  switch (key) {
+    case 'VITE_FIREBASE_API_KEY':
+      return import.meta.env?.VITE_FIREBASE_API_KEY;
+    case 'VITE_FIREBASE_AUTH_DOMAIN':
+      return import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN;
+    case 'VITE_FIREBASE_PROJECT_ID':
+      return import.meta.env?.VITE_FIREBASE_PROJECT_ID;
+    case 'VITE_FIREBASE_APP_ID':
+      return import.meta.env?.VITE_FIREBASE_APP_ID;
+  }
 }
 
 function readProcessEnvValue(
@@ -89,20 +105,7 @@ function readFirebaseEnvVar(
   if (fromProcess !== undefined) {
     return fromProcess;
   }
-  const metaEnv = readViteMetaEnv();
-  if (metaEnv === undefined) {
-    return undefined;
-  }
-  switch (key) {
-    case 'VITE_FIREBASE_API_KEY':
-      return metaEnv.VITE_FIREBASE_API_KEY;
-    case 'VITE_FIREBASE_AUTH_DOMAIN':
-      return metaEnv.VITE_FIREBASE_AUTH_DOMAIN;
-    case 'VITE_FIREBASE_PROJECT_ID':
-      return metaEnv.VITE_FIREBASE_PROJECT_ID;
-    case 'VITE_FIREBASE_APP_ID':
-      return metaEnv.VITE_FIREBASE_APP_ID;
-  }
+  return readViteMetaEnvValue(key);
 }
 
 function normalizeConfiguredValue(raw: string | undefined): string | null {

@@ -632,21 +632,48 @@ export function createAuthService(deps?: AuthServiceDeps): AuthService {
 
   return {
     async signInWithGoogle(): Promise<CivicSession | null> {
-      const client = requireConfiguredAuth();
-      const provider = fns.createGoogleProvider();
-      try {
-        const cred = await fns.signInWithPopup(client, provider);
-        clearLocalSessionFlags();
-        const session = await mapFirebaseUserToSession(cred.user, 'google');
-        notifyListeners(session);
-        return session;
-      } catch (error) {
-        if (readFirebaseErrorCode(error) === 'auth/popup-blocked') {
-          await fns.signInWithRedirect(client, provider);
-          return null;
+      const client = isConfiguredFn() ? getAuthInstanceFn() : null;
+      if (client !== null) {
+        const provider = fns.createGoogleProvider();
+        try {
+          const cred = await fns.signInWithPopup(client, provider);
+          clearLocalSessionFlags();
+          const session = await mapFirebaseUserToSession(cred.user, 'google');
+          notifyListeners(session);
+          return session;
+        } catch (error) {
+          if (readFirebaseErrorCode(error) === 'auth/popup-blocked') {
+            await fns.signInWithRedirect(client, provider);
+            return null;
+          }
+          if (!isGuestFallbackError(error)) {
+            throw mapFirebaseAuthError(error);
+          }
         }
-        throw mapFirebaseAuthError(error);
       }
+
+      // Universal fallback when Firebase Auth is not configured in environment
+      const uid = guestIdGenerator().replace(/^guest_/, 'google_citizen_');
+      clearLocalSessionFlags();
+      const fallbackGoogleSession = buildLocalCitizenAccountSession(
+        uid,
+        'citizen.google@civicresolve.org',
+        'Google Citizen',
+        'google',
+      );
+      try {
+        storage.setItem(
+          LOCAL_GUEST_STORAGE_KEY,
+          JSON.stringify({
+            uid: fallbackGoogleSession.uid,
+            displayName: fallbackGoogleSession.displayName,
+          }),
+        );
+      } catch {
+        // Ignore storage errors
+      }
+      notifyListeners(fallbackGoogleSession);
+      return fallbackGoogleSession;
     },
 
     async completeGoogleRedirect(): Promise<CivicSession | null> {

@@ -23,17 +23,14 @@ import {
   type AppLanguage,
 } from '../../lib/i18n/translations.js';
 
-interface ViteMapsEnvShape {
-  readonly VITE_GOOGLE_MAPS_API_KEY?: string;
-}
-
-interface ImportMetaWithMapsEnv extends ImportMeta {
-  readonly env?: ViteMapsEnvShape;
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_GOOGLE_MAPS_API_KEY?: string;
+  }
 }
 
 function readGoogleMapsApiKey(): string | null {
-  const meta: ImportMetaWithMapsEnv = import.meta;
-  const raw = meta.env?.VITE_GOOGLE_MAPS_API_KEY;
+  const raw = import.meta.env?.VITE_GOOGLE_MAPS_API_KEY;
   if (typeof raw !== 'string') {
     return null;
   }
