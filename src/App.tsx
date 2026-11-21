@@ -1,4 +1,6 @@
 import React, {
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useMemo,
@@ -26,13 +28,30 @@ import {
   type AppLanguage,
 } from './lib/i18n/translations.js';
 import { createDefaultIssueRepository } from './lib/repositories/hybridIssueRepository.js';
-import { AdminDashboardView } from './components/admin/AdminDashboardView.js';
 import { PortalLoginView } from './components/auth/PortalLoginView.js';
-import { TrackIssuesView } from './components/dashboard/TrackIssuesView.js';
 import { BionisSidebar } from './components/layout/BionisSidebar.js';
 import { TopNav, type ActiveTab } from './components/layout/TopNav.js';
-import { ReportIssueView } from './components/report/ReportIssueView.js';
-import { DimensionalSpecModal } from './components/spec/DimensionalSpecModal.js';
+
+const AdminDashboardView = lazy(() =>
+  import('./components/admin/AdminDashboardView.js').then((m) => ({
+    default: m.AdminDashboardView,
+  })),
+);
+const TrackIssuesView = lazy(() =>
+  import('./components/dashboard/TrackIssuesView.js').then((m) => ({
+    default: m.TrackIssuesView,
+  })),
+);
+const ReportIssueView = lazy(() =>
+  import('./components/report/ReportIssueView.js').then((m) => ({
+    default: m.ReportIssueView,
+  })),
+);
+const DimensionalSpecModal = lazy(() =>
+  import('./components/spec/DimensionalSpecModal.js').then((m) => ({
+    default: m.DimensionalSpecModal,
+  })),
+);
 
 export function App(): React.ReactElement {
   const repository = useMemo(() => createDefaultIssueRepository(), []);
@@ -268,12 +287,16 @@ export function App(): React.ReactElement {
     <div className={darkTheme ? 'dark' : ''}>
       <div
         ref={atmosphereRef}
-        className={`nixtio-atmosphere overflow-x-hidden px-2.5 text-[#11131a] transition-colors sm:px-5 dark:text-slate-100 ${
+        className={`nixtio-atmosphere overflow-x-hidden px-2.5 text-[#11131a] sm:px-5 dark:text-slate-100 ${
           isSinglePageDesktop
             ? 'flex min-h-screen items-center justify-center py-2.5 lg:h-screen lg:overflow-hidden'
             : 'min-h-screen py-3 sm:py-6'
         }`}
       >
+        {/* GPU-Composited Scroll-Driven Lavender (Right->Left) & Warm Sandy (Left->Right) Orbs */}
+        <div aria-hidden="true" className="atmosphere-orb-lavender" />
+        <div aria-hidden="true" className="atmosphere-orb-sandy" />
+
         <div
           className={`nixtio-shell mx-auto flex w-full max-w-[1440px] flex-col overflow-hidden rounded-[22px] sm:rounded-[30px] ${
             isSinglePageDesktop
@@ -348,13 +371,20 @@ export function App(): React.ReactElement {
                 </div>
               )}
 
-              {/* Liquid-Glass Animated Tab Panel Transition */}
+              {/* 60fps Compositor-Only Tab Panel Transition + Lazy Code-Split Suspense */}
               <main className="flex-1 overflow-x-hidden overflow-y-auto lg:overflow-y-visible">
                 <div
                   key={viewTransitionKey}
                   className="tab-transition-enter h-full"
                 >
-                  {!session ? (
+                  <Suspense
+                    fallback={
+                      <div className="flex h-64 items-center justify-center text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        Loading workspace...
+                      </div>
+                    }
+                  >
+                    {!session ? (
                     <PortalLoginView
                       language={language}
                       onCitizenGuestSignIn={async () => {
@@ -466,6 +496,7 @@ export function App(): React.ReactElement {
                       onUpdateIssue={handleAdminUpdateIssue}
                     />
                   )}
+                  </Suspense>
                 </div>
               </main>
 
@@ -490,10 +521,14 @@ export function App(): React.ReactElement {
           </div>
         </div>
 
-        <DimensionalSpecModal
-          isOpen={isSpecModalOpen}
-          onClose={() => setIsSpecModalOpen(false)}
-        />
+        <Suspense fallback={null}>
+          {isSpecModalOpen && (
+            <DimensionalSpecModal
+              isOpen={isSpecModalOpen}
+              onClose={() => setIsSpecModalOpen(false)}
+            />
+          )}
+        </Suspense>
       </div>
     </div>
   );

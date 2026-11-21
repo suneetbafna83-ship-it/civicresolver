@@ -66,7 +66,7 @@ describe('CivicResolve Phase 2 Frontend UI, Dual-Portal Login & Strict Workspace
       screen.queryByRole('button', { name: /Municipal Admin Desk/i }),
     ).toBeNull();
 
-    const sampleBtn = screen.getByRole('button', {
+    const sampleBtn = await screen.findByRole('button', {
       name: /Sample 2: Burst Water Pipe/i,
     });
     fireEvent.click(sampleBtn);

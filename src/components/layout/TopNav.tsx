@@ -93,22 +93,29 @@ export function TopNav({
             </span>
 
             {session ? (
-              <span
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white ${
-                  isAdmin ? 'bg-[#581c87]' : 'bg-[#3730a3]'
-                }`}
-              >
-                {isAdmin && scopedDept !== null && (
-                  <Lock className="h-3 w-3" aria-hidden="true" />
-                )}
-                <span>
-                  {isAdmin
-                    ? scopedDept !== null
-                      ? `${translateDepartment(scopedDept, language)} ${t.onlyTag}`
-                      : t.allDeptAdminTag
-                    : t.citizenWorkspaceTag}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white ${
+                    isAdmin ? 'bg-[#581c87]' : 'bg-[#3730a3]'
+                  }`}
+                >
+                  {isAdmin && scopedDept !== null && (
+                    <Lock className="h-3 w-3" aria-hidden="true" />
+                  )}
+                  <span>
+                    {isAdmin
+                      ? scopedDept !== null
+                        ? `${translateDepartment(scopedDept, language)} ${t.onlyTag}`
+                        : t.allDeptAdminTag
+                      : t.citizenWorkspaceTag}
+                  </span>
                 </span>
-              </span>
+                {(session.isPreviewAdmin || session.isAnonymous) && (
+                  <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200">
+                    Demo Mode
+                  </span>
+                )}
+              </div>
             ) : (
               <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-semibold text-[#3730a3] dark:bg-indigo-950/70 dark:text-indigo-200">
                 {t.gateBadge}

@@ -7,6 +7,14 @@ CivicResolve is a zero-cost, resilient municipal issue reporting, multimodal AI 
 
 ---
 
+## Instant 1-Click Demo Mode (Both Citizen & Municipal Admin — Zero Setup Required)
+Evaluators and judges can test the entire platform immediately with **zero login credentials or API keys required**:
+- **Citizen Demo Mode:** Click **`Enter Citizen Workspace (1-Click Demo Citizen)`** on the Citizen Portal card (or enter any valid email ID + 6-char password to auto-register). Includes 4 1-click sample issue presets (`Deep Pothole`, `Burst Water Pipe`, `Broken Streetlight`, `Overflowing Bins`), interactive GPS + Pin-Point map, AI triage preview, live SLA tracker, before/after proof viewer, and downloadable receipts.
+- **Municipal Admin Demo Mode:** Click **`Enter Admin Command Desk (1-Click Demo Admin)`** on the Municipal Admin card for full city-wide operations, urgency queue (`10 → 1`), after-repair photo uploads, CSV export, and cross-department transfer approvals.
+- **Scoped Department Staff RBAC Login:** Use any department officer email & passkey below (e.g., `water.staff@civicresolve.gov` / `Water#2026`) to verify strict department-only isolation.
+
+---
+
 ## 7-Parameter Hackathon Evaluation Rubric Alignment
 
 ### 1. Problem Statement Alignment (6/6 Core Flows Verified End-to-End)

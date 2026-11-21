@@ -39,5 +39,33 @@ export default defineConfig({
   build: {
     sourcemap: false,
     chunkSizeWarningLimit: 650,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-firebase',
+              test: /node_modules[\\/]firebase|@firebase/,
+              priority: 20,
+            },
+            {
+              name: 'vendor-maps',
+              test: /node_modules[\\/](leaflet|@vis\.gl)/,
+              priority: 18,
+            },
+            {
+              name: 'vendor-react',
+              test: /node_modules[\\/](react|react-dom|scheduler)/,
+              priority: 16,
+            },
+            {
+              name: 'vendor-icons-zod',
+              test: /node_modules[\\/](lucide-react|zod)/,
+              priority: 14,
+            },
+          ],
+        },
+      },
+    },
   },
 });
